@@ -1,0 +1,41 @@
+# ── Environment & Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ───────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── Django ───────────────────────────────────────────────────────────────────
+staticfiles/
+media/
+*.sqlite3
+*.log
+db.sqlite3
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Tooling ──────────────────────────────────────────────────────────────────
+pip-audit-cache/
+node_modules/
+.coverage
+htmlcov/

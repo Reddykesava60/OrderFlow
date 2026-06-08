@@ -1,0 +1,101 @@
+{% extends "owner/base.html" %}
+{% block title %}Order #{{ order.order_number }}{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+  <h1 style="margin:0">Order #{{ order.order_number }}</h1>
+  <a href="{% url 'owner:dashboard' %}" class="btn btn-ghost">Back to dashboard</a>
+</div>
+
+<div class="card" style="max-width:760px">
+  <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+    <div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700">
+        Restaurant</div>
+      <div style="font-size:15px;font-weight:700">{{ restaurant.name }}</div>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700">
+        Placed</div>
+      <div style="font-size:15px;font-weight:700">{{ order.created_at|date:"d M Y, H:i" }}</div>
+    </div>
+  </div>
+
+  <div class="form-row" style="margin-bottom:18px">
+    <div class="card" style="margin:0;padding:14px 16px">
+      <div
+        style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">
+        Customer</div>
+      <div style="font-size:15px;font-weight:700">{{ order.customer_name }}</div>
+    </div>
+    <div class="card" style="margin:0;padding:14px 16px">
+      <div
+        style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">
+        Table</div>
+      <div style="font-size:15px;font-weight:700">{{ order.table_number|default:"Walk-in" }}</div>
+    </div>
+  </div>
+
+  <div class="form-row" style="margin-bottom:22px">
+    <div class="card" style="margin:0;padding:14px 16px">
+      <div
+        style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">
+        Payment</div>
+      <div style="font-size:15px;font-weight:700">{{ order.get_payment_method_display }}</div>
+    </div>
+    <div class="card" style="margin:0;padding:14px 16px">
+      <div
+        style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">
+        Status</div>
+      <div>
+        <span
+          class="badge {% if order.status == 'CANCELLED' %}badge-red{% elif order.status == 'UNPAID' %}badge-amber{% else %}badge-green{% endif %}">
+          {{ order.get_status_display }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-bottom:14px">Receipt breakdown</h2>
+  {% for item in order.items.all %}
+  <div style="padding:14px 0;border-top:1px solid #f1f5f9">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start">
+      <div>
+        <div style="font-size:15px;font-weight:700">{{ item.quantity }}x {{ item.menu_item_name }}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">
+          {{ item.get_dining_option_display }}
+          {% if item.spice_level %} · {{ item.get_spice_level_display }}{% endif %}
+        </div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:var(--brand)">₹{{ item.line_total }}</div>
+    </div>
+
+    {% if item.addons.all %}
+    <div style="display:grid;gap:8px;margin-top:10px">
+      {% for addon in item.addons.all %}
+      <div
+        style="display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:10px;background:#f8fafc;font-size:13px">
+        <div>{{ addon.addon_name }} x{{ addon.quantity }}</div>
+        <div style="font-weight:700;color:var(--muted)">₹{{ addon.line_total }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:14px;display:grid;gap:8px">
+    <div style="display:flex;justify-content:space-between;font-size:14px">
+      <span>Payment method</span>
+      <span>{{ order.get_payment_method_display }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:14px">
+      <span>Status</span>
+      <span>{{ order.get_status_display }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;color:var(--brand)">
+      <span>Total</span>
+      <span>₹{{ order.total }}</span>
+    </div>
+  </div>
+</div>
+{% endblock %}

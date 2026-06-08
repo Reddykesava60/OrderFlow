@@ -1,0 +1,35 @@
+<!-- ordering/templates/ordering/_item_card.html -->
+<div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex gap-4 cursor-pointer hover:border-brand-300 transition-all active:scale-[0.98]" 
+     @click="openItem('{{ item.id }}')">
+  
+  <div class="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
+    {% if item.image %}
+      <img class="w-full h-full object-cover" src="{{ item.image }}" alt="{{ item.name }}" loading="lazy">
+    {% else %}
+      <div class="w-full h-full flex items-center justify-center text-[10px] font-black uppercase text-slate-300">No Image</div>
+    {% endif %}
+  </div>
+
+  <div class="flex-1 min-w-0 flex flex-col justify-between">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if item.is_veg %}bg-emerald-500{% else %}bg-rose-500{% endif %} flex-shrink-0"></span>
+        <h3 class="font-black text-slate-800 text-sm md:text-base leading-tight truncate">{{ item.name }}</h3>
+        {% if item.has_addons %}
+          <span class="px-1.5 py-0.5 bg-brand-50 text-brand-600 text-[8px] font-black uppercase rounded">Plus</span>
+        {% endif %}
+      </div>
+      {% if item.description %}
+        <p class="text-[10px] md:text-xs font-medium text-slate-400 mt-1 line-clamp-2">{{ item.description }}</p>
+      {% endif %}
+    </div>
+    
+    <div class="flex items-center justify-between mt-2">
+      <div class="text-sm md:text-base font-black text-brand-800">₹{{ item.base_price }}</div>
+      <button class="bg-white border-2 border-brand-800 text-brand-800 px-5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-800 hover:text-white transition-all shadow-sm active:scale-90"
+              @click.stop="openItem('{{ item.id }}')">
+        Add
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,553 @@
+<!-- ordering/templates/ordering/menu.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>{{ restaurant.name }}</title>
+  
+  <!-- Tailwind & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  
+  {% load static %}
+  {% load menu_extras %}
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              300: '#7cc8fb',
+              400: '#36abf7',
+              500: '#0c91eb',
+              600: '#0071c9',
+              700: '#005aa3',
+              800: '#1a3c5e',
+              900: '#0a233d',
+            },
+            accent: '#e85d20',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    body { -webkit-tap-highlight-color: transparent; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col" x-data="dineflow()" x-init="loadCart()">
+
+  <!-- Sticky Header -->
+  <header class="bg-brand-800 text-white px-4 py-4 md:px-8 flex items-center justify-between sticky top-0 z-[100] shadow-md border-b border-white/5">
+    <div>
+      <h1 class="text-lg font-black tracking-tight leading-none">{{ restaurant.name }}</h1>
+      <p class="text-[10px] font-bold text-brand-300 mt-1 uppercase tracking-widest">Order Live</p>
+    </div>
+    
+    <button class="bg-accent text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 transition-all active:scale-95 shadow-lg shadow-accent/20 disabled:opacity-50"
+            :disabled="cartCount === 0"
+            @click="showCart = true">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+      Cart <span class="bg-white/20 px-2 py-0.5 rounded-lg text-[10px]" x-show="cartCount > 0" x-text="cartCount"></span>
+    </button>
+  </header>
+
+  <!-- Category Quick Links (Horizontal Scroll) -->
+  <nav class="bg-white border-b border-slate-100 px-4 py-3 sticky top-[72px] z-[90] overflow-x-auto hide-scrollbar flex items-center gap-2">
+    {% for item_type, items in grouped.items %}
+    <a href="#cat-{{ item_type.id }}" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 bg-slate-50 text-slate-400 active:bg-brand-50 active:text-brand-700 transition-all">
+      {{ item_type.name }}
+    </a>
+    {% endfor %}
+    {% if ungrouped %}
+    <a href="#cat-other" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 bg-slate-50 text-slate-400 active:bg-brand-50 active:text-brand-700 transition-all">
+      Other
+    </a>
+    {% endif %}
+  </nav>
+
+  <!-- Menu Content -->
+  <main class="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-10 mb-10">
+    
+    {% for item_type, items in grouped.items %}
+    <section id="cat-{{ item_type.id }}" class="space-y-4 scroll-mt-28">
+      <div class="flex items-center gap-4">
+        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">{{ item_type.name }}</h2>
+        <div class="flex-1 h-px bg-slate-200"></div>
+      </div>
+      <div class="grid grid-cols-1 gap-4">
+        {% for item in items %}
+          {% include "ordering/_item_card.html" %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+    {% if ungrouped %}
+    <section id="cat-other" class="space-y-4 scroll-mt-28">
+      <div class="flex items-center gap-4">
+        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Other</h2>
+        <div class="flex-1 h-px bg-slate-200"></div>
+      </div>
+      <div class="grid grid-cols-1 gap-4">
+        {% for item in ungrouped %}
+          {% include "ordering/_item_card.html" %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  </main>
+
+  <!-- ── Customisation Overlay ── -->
+  <div x-show="activeItem" 
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-end justify-center sm:items-center sm:p-4" 
+       @click.self="activeItem = null" x-cloak>
+    
+    <div @click.stop 
+         x-show="activeItem"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="translate-y-full sm:translate-y-4 sm:scale-95"
+         x-transition:enter-end="translate-y-0 sm:scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="translate-y-0 sm:scale-100"
+         x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95"
+         class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden safe-bottom">
+      
+      <div class="h-1.5 w-12 bg-slate-200 rounded-full mx-auto my-3 sm:hidden"></div>
+      
+      <template x-if="activeItem">
+        <div class="p-6 space-y-6">
+          <div>
+            <h3 class="text-2xl font-black text-slate-900 leading-tight" x-text="activeItem.name"></h3>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Customize your selection</p>
+          </div>
+
+          <!-- Dining option -->
+          <div class="space-y-3">
+            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dining Option</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button class="px-4 py-3 rounded-2xl text-sm font-bold border transition-all"
+                      :class="selection.dining === 'DINE_IN' ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400'"
+                      @click="selection.dining = 'DINE_IN'">Dine In</button>
+              <button class="px-4 py-3 rounded-2xl text-sm font-bold border transition-all"
+                      :class="selection.dining === 'PARCEL' ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400'"
+                      @click="selection.dining = 'PARCEL'">
+                Parcel
+                <span class="text-[10px] block opacity-60" x-show="activeItem.parcel_surcharge > 0" x-text="'+₹' + activeItem.parcel_surcharge"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Spice level -->
+          <div class="space-y-3" x-show="activeItem.spice_configurable">
+            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Spice Level</label>
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="s in ['MILD','MEDIUM','HOT']">
+                <button class="px-3 py-3 rounded-2xl text-xs font-bold border transition-all"
+                        :class="selection.spice === s ? 'bg-brand-50 border-brand-300 text-brand-700 shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400'"
+                        @click="selection.spice = s"
+                        x-text="s.charAt(0) + s.slice(1).toLowerCase()"></button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Add-ons -->
+          <div class="space-y-3" x-show="activeItem.addons && activeItem.addons.length > 0">
+            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Add-ons</label>
+            <div class="space-y-2">
+              <template x-for="addon in activeItem.addons" :key="addon.id">
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div>
+                    <div class="text-sm font-bold text-slate-700" x-text="addon.name"></div>
+                    <div class="text-[10px] font-bold text-slate-400" x-text="'₹' + addon.price"></div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <button class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center font-black active:bg-slate-100 transition-all" @click="decAddon(addon)">−</button>
+                    <span class="text-sm font-black w-4 text-center" x-text="selection.addons[addon.id] || 0"></span>
+                    <button class="w-8 h-8 rounded-full bg-white border border-slate-200 text-brand-600 flex items-center justify-center font-black active:bg-slate-100 transition-all" @click="incAddon(addon)">+</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-4">
+            <div class="flex items-center gap-4">
+               <button class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-black active:bg-slate-200 transition-all" @click="if(selection.qty > 1) selection.qty--">−</button>
+               <span class="text-lg font-black w-6 text-center" x-text="selection.qty"></span>
+               <button class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-900 flex items-center justify-center font-black active:bg-slate-200 transition-all" @click="if(selection.qty < 99) selection.qty++">+</button>
+            </div>
+            <div class="text-right">
+               <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</div>
+               <div class="text-xl font-black text-brand-800" x-text="'₹' + itemSubtotal()"></div>
+            </div>
+          </div>
+
+          <button class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all mt-4" 
+                  @click="addToCart()">
+            Add to cart
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ── Cart Sheet ── -->
+  <div x-show="showCart" 
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-end justify-center sm:items-center sm:p-4" 
+       @click.self="showCart = false" x-cloak>
+    
+    <div @click.stop 
+         x-show="showCart"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="translate-y-full sm:translate-y-4 sm:scale-95"
+         x-transition:enter-end="translate-y-0 sm:scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="translate-y-0 sm:scale-100"
+         x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95"
+         class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden safe-bottom">
+      
+      <div class="h-1.5 w-12 bg-slate-200 rounded-full mx-auto my-3 sm:hidden"></div>
+      
+      <div class="p-6 space-y-6">
+        <h3 class="text-xl font-black text-slate-900 tracking-tight">Your Order</h3>
+
+        <div class="max-h-[40vh] overflow-y-auto space-y-4 pr-1 divide-y divide-slate-50">
+          <template x-for="(line, idx) in cart" :key="idx">
+            <div class="flex justify-between items-start pt-4 first:pt-0">
+              <div class="flex-1 min-w-0">
+                <div class="font-black text-slate-800 leading-tight">
+                   <span class="text-brand-600 mr-1" x-text="line.qty + '×'"></span><span x-text="line.name"></span>
+                </div>
+                <div class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider" x-text="lineDetail(line)"></div>
+              </div>
+              <div class="flex items-center gap-4 ml-4">
+                <span class="font-black text-brand-800 text-sm" x-text="'₹' + lineTotal(line)"></span>
+                <button class="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center active:bg-rose-100" @click="removeFromCart(idx)">×</button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex justify-between items-center py-4 border-t-2 border-slate-100">
+          <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Order Total</span>
+          <span class="text-2xl font-black text-brand-800" x-text="'₹' + cartTotal()"></span>
+        </div>
+
+        <!-- Checkout Form -->
+        <div class="space-y-4">
+          <div class="text-rose-500 text-[10px] font-black uppercase tracking-widest bg-rose-50 p-3 rounded-xl border border-rose-100" x-show="checkoutError" x-text="checkoutError"></div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+             <div class="space-y-1">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Name *</label>
+                <input type="text" placeholder="e.g. John Doe" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-brand-300 outline-none transition-all" x-model="customerName" maxlength="60">
+             </div>
+             <div class="space-y-1">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Table / Seat</label>
+                <input type="text" placeholder="e.g. 12" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-brand-300 outline-none transition-all" x-model="tableNumber" maxlength="20">
+             </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Method</label>
+            <select x-model="paymentMethod" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-brand-300 outline-none transition-all appearance-none">
+              {% if config.cash_enabled %}<option value="CASH">💵 Cash at Counter</option>{% endif %}
+              {% if upi_available %}<option value="UPI">💳 Digital / UPI</option>{% endif %}
+              <option value="POST_PAYMENT">👤 Post Payment (Account)</option>
+            </select>
+          </div>
+
+          <div x-show="paymentMethod === 'POST_PAYMENT'" class="grid grid-cols-1 md:grid-cols-2 gap-3" x-cloak>
+             <div class="space-y-1">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Customer ID *</label>
+                <input type="number" placeholder="e.g. 1" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-brand-300 outline-none transition-all" x-model="customerSerial">
+             </div>
+             <div class="space-y-1">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">PIN *</label>
+                <input type="password" placeholder="e.g. 1234" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-bold focus:border-brand-300 outline-none transition-all" x-model="customerPin" maxlength="6">
+             </div>
+          </div>
+
+          <label class="flex items-start gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer">
+            <input type="checkbox" id="consent" x-model="consentGiven" class="mt-1 w-4 h-4 rounded border-slate-300 text-brand-600">
+            <span class="text-[10px] font-bold text-slate-400 leading-normal">I agree to my order details being used to prepare my food.</span>
+          </label>
+
+          <button class="w-full bg-accent text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
+                  :disabled="(paymentMethod !== 'POST_PAYMENT' && !customerName.trim()) || (paymentMethod === 'POST_PAYMENT' && (!customerSerial || !customerPin)) || !consentGiven || placing"
+                  @click="placeOrder()">
+            <span x-show="!placing">Place Order Now</span>
+            <span x-show="placing">Placing Order…</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Menu item data injected from Django
+    const MENU_DATA = {
+      {% for item_type, items in grouped.items %}
+        {% for item in items %}
+          "{{ item.id }}": {
+            id: "{{ item.id }}",
+            name: {{ item.name|jsonify }},
+            base_price: {{ item.base_price }},
+            parcel_surcharge: {{ item.parcel_surcharge }},
+            spice_configurable: {{ item.spice_configurable|yesno:"true,false" }},
+            has_addons: {{ item.has_addons|yesno:"true,false" }},
+            addons: [
+              {% for link in item.menuitemaddon_set.all %}
+                {% if link.addon.is_active %}
+                {
+                  id: "{{ link.addon.id }}",
+                  name: {{ link.addon.name|jsonify }},
+                  price: {{ link.addon.price }},
+                  max_qty: {{ link.addon.max_qty }},
+                },
+                {% endif %}
+              {% endfor %}
+            ],
+          },
+        {% endfor %}
+      {% endfor %}
+      {% for item in ungrouped %}
+        "{{ item.id }}": {
+          id: "{{ item.id }}",
+          name: {{ item.name|jsonify }},
+          base_price: {{ item.base_price }},
+          parcel_surcharge: {{ item.parcel_surcharge }},
+          spice_configurable: {{ item.spice_configurable|yesno:"true,false" }},
+          has_addons: {{ item.has_addons|yesno:"true,false" }},
+          addons: [
+            {% for link in item.menuitemaddon_set.all %}
+              {% if link.addon.is_active %}
+              { id: "{{ link.addon.id }}", name: {{ link.addon.name|jsonify }},
+                price: {{ link.addon.price }}, max_qty: {{ link.addon.max_qty }} },
+              {% endif %}
+            {% endfor %}
+          ],
+        },
+      {% endfor %}
+    };
+
+    const CHECKOUT_URL        = "{% url 'ordering:checkout' restaurant.slug %}";
+    const RAZORPAY_VERIFY_URL = "{% url 'razorpay_verify' %}";
+    const CSRF_TOKEN          = "{{ csrf_token }}";
+
+    function dineflow() {
+      return {
+        cart:          [],
+        activeItem:    null,
+        selection:     { dining: 'DINE_IN', spice: 'MILD', qty: 1, addons: {} },
+        showCart:      false,
+        customerName:  '',
+        tableNumber:   '',
+        customerSerial: '',
+        customerPin:   '',
+        paymentMethod: 'CASH',
+        consentGiven:  false,
+        placing:       false,
+        checkoutError: '',
+        idempotencyKey: null,
+
+        get cartCount() { return this.cart.reduce((s, l) => s + l.qty, 0); },
+
+        loadCart() {
+          try {
+            this.cart = JSON.parse(sessionStorage.getItem('df_cart') || '[]');
+          } catch(e) { this.cart = []; }
+        },
+        saveCart() {
+          sessionStorage.setItem('df_cart', JSON.stringify(this.cart));
+        },
+
+        openItem(id) {
+          const item = MENU_DATA[id];
+          if (!item) return;
+          this.activeItem = item;
+          this.selection = { dining: 'DINE_IN', spice: 'MILD', qty: 1, addons: {} };
+        },
+
+        incAddon(addon) {
+          const cur = this.selection.addons[addon.id] || 0;
+          if (cur < addon.max_qty) this.selection.addons[addon.id] = cur + 1;
+        },
+        decAddon(addon) {
+          const cur = this.selection.addons[addon.id] || 0;
+          if (cur > 0) this.selection.addons[addon.id] = cur - 1;
+        },
+
+        itemSubtotal() {
+          if (!this.activeItem) return 0;
+          let total = this.activeItem.base_price;
+          if (this.selection.dining === 'PARCEL') total += this.activeItem.parcel_surcharge;
+          for (const [id, qty] of Object.entries(this.selection.addons)) {
+            const addon = this.activeItem.addons.find(a => a.id === id);
+            if (addon) total += addon.price * qty;
+          }
+          return (total * this.selection.qty).toFixed(2);
+        },
+
+        addToCart() {
+          if (!this.activeItem) return;
+          const addons = Object.entries(this.selection.addons)
+            .filter(([,q]) => q > 0)
+            .map(([id, qty]) => {
+              const a = this.activeItem.addons.find(x => x.id === id);
+              return { addon_id: id, name: a.name, price: a.price, quantity: qty };
+            });
+          this.cart.push({
+            item_id:   this.activeItem.id,
+            name:      this.activeItem.name,
+            base_price:      this.activeItem.base_price,
+            parcel_surcharge:this.activeItem.parcel_surcharge,
+            qty:       this.selection.qty,
+            dining:    this.selection.dining,
+            spice:     this.activeItem.spice_configurable ? this.selection.spice : '',
+            addons,
+          });
+          this.saveCart();
+          this.activeItem = null;
+        },
+
+        removeFromCart(idx) {
+          this.cart.splice(idx, 1);
+          this.saveCart();
+        },
+
+        lineTotal(line) {
+          let t = line.base_price;
+          if (line.dining === 'PARCEL') t += line.parcel_surcharge;
+          for (const a of line.addons) t += a.price * a.quantity;
+          return (t * line.qty).toFixed(2);
+        },
+        lineDetail(line) {
+          const parts = [];
+          if (line.dining === 'PARCEL') parts.push('Parcel');
+          if (line.spice) parts.push(line.spice.charAt(0) + line.spice.slice(1).toLowerCase());
+          for (const a of line.addons) parts.push(a.name + ' ×' + a.quantity);
+          return parts.join(' · ');
+        },
+        cartTotal() {
+          return this.cart.reduce((s, l) => s + parseFloat(this.lineTotal(l)), 0).toFixed(2);
+        },
+
+        async placeOrder() {
+          if (this.placing) return;
+          this.checkoutError = '';
+          this.placing = true;
+          
+          if (!this.idempotencyKey) {
+            this.idempotencyKey = crypto.randomUUID();
+          }
+          
+          const payload = {
+            customer_name:  this.customerName.trim(),
+            table_number:   this.tableNumber.trim(),
+            payment_method: this.paymentMethod,
+            customer_serial: this.customerSerial,
+            customer_pin:    this.customerPin,
+            consent_given:  this.consentGiven,
+            cart: this.cart.map(l => ({
+              item_id:       l.item_id,
+              quantity:      l.qty,
+              dining_option: l.dining,
+              spice_level:   l.spice,
+              addons:        l.addons.map(a => ({ addon_id: a.addon_id, quantity: a.quantity })),
+            })),
+            idempotency_key: this.idempotencyKey,
+          };
+          try {
+            const res = await fetch(CHECKOUT_URL, {
+              method:  'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken':  CSRF_TOKEN,
+              },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+              sessionStorage.removeItem('df_cart');
+              window.location.href = data.redirect;
+            } else if (data.status === 'razorpay_pending') {
+              const options = {
+                key:         data.razorpay_key_id,
+                amount:      data.total_paise,
+                currency:    'INR',
+                order_id:    data.razorpay_order_id,
+                name:        '{{ restaurant.name|escapejs }}',
+                description: 'Order #' + data.order_number,
+                prefill: {
+                  name: this.customerName.trim(),
+                },
+                theme: { color: '#1a3c5e' },
+                handler: async (response) => {
+                  sessionStorage.removeItem('df_cart');
+                  try {
+                    await fetch(RAZORPAY_VERIFY_URL, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN,
+                      },
+                      body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature,
+                      }),
+                    });
+                  } catch (e) { }
+                  window.location.href = data.receipt_url + '?upi=1';
+                }
+              };
+              const rzp = new Razorpay(options);
+              rzp.open();
+            } else {
+              this.checkoutError = data.message || 'Something went wrong.';
+              this.placing = false;
+              this.idempotencyKey = null;
+            }
+          } catch(e) {
+            this.checkoutError = 'Network error. Please try again.';
+            this.placing = false;
+            this.idempotencyKey = null;
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>

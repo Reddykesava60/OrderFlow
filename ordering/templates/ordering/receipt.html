@@ -1,0 +1,154 @@
+<!-- ordering/templates/ordering/receipt.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Order #{{ order.order_number }} — {{ restaurant.name }}</title>
+  
+  <!-- Tailwind & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              300: '#7cc8fb',
+              400: '#36abf7',
+              500: '#0c91eb',
+              600: '#0071c9',
+              700: '#005aa3',
+              800: '#1a3c5e',
+              900: '#0a233d',
+            },
+            accent: '#e85d20',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+    .receipt-paper {
+       position: relative;
+    }
+    .receipt-paper::after {
+       content: "";
+       position: absolute;
+       bottom: -10px;
+       left: 0;
+       right: 0;
+       height: 10px;
+       background: radial-gradient(circle, transparent 70%, white 70%) 0 0 / 15px 15px repeat-x;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-100 text-slate-900 font-sans min-h-screen p-4 md:p-8 flex items-center justify-center">
+
+  <div class="w-full max-w-md space-y-4">
+    
+    <div class="bg-white rounded-3xl shadow-2xl overflow-hidden receipt-paper">
+      
+      <!-- Top Section -->
+      <div class="bg-brand-800 p-8 text-center text-white">
+        <p class="text-[10px] font-black uppercase tracking-widest text-brand-300">{{ restaurant.name }}</p>
+        <h1 class="text-6xl font-black mt-2 tracking-tighter">#{{ order.order_number }}</h1>
+        <p class="text-[10px] font-black uppercase tracking-[0.2em] mt-2 opacity-60">Order Number</p>
+        
+        <div class="mt-6 flex justify-center">
+           <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest
+                        {% if order.status == 'UNPAID' %}bg-amber-500/20 text-amber-300 border border-amber-500/30
+                        {% elif order.status == 'CANCELLED' %}bg-rose-500/20 text-rose-300 border border-rose-500/30
+                        {% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
+             {{ order.get_status_display }}
+           </span>
+        </div>
+      </div>
+
+      <!-- Content Section -->
+      <div class="p-8 space-y-6">
+        <div class="divide-y divide-slate-100">
+          {% for item in order.items.all %}
+          <div class="py-4 first:pt-0">
+            <div class="flex justify-between items-start">
+               <div class="flex-1 min-w-0">
+                  <div class="font-black text-slate-800 leading-tight">
+                    <span class="text-brand-600 mr-1">{{ item.quantity }}×</span> {{ item.menu_item_name }}
+                  </div>
+                  <div class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
+                     {{ item.get_dining_option_display }}
+                     {% if item.spice_level %} · {{ item.get_spice_level_display }}{% endif %}
+                     {% for addon in item.addons.all %}
+                        · {{ addon.addon_name }} ×{{ addon.quantity }}
+                     {% endfor %}
+                  </div>
+               </div>
+               <div class="ml-4 font-black text-slate-900">₹{{ item.line_total }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="pt-6 space-y-2 border-t-2 border-dashed border-slate-100">
+           <div class="flex justify-between items-center">
+              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total</span>
+              <span class="text-2xl font-black text-brand-800">₹{{ order.total }}</span>
+           </div>
+           {% if fee_record %}
+           <div class="flex justify-between items-center opacity-40">
+              <span class="text-[9px] font-bold uppercase tracking-widest">Incl. Platform Fee</span>
+              <span class="text-[10px] font-bold">₹{{ fee_record.fee_amount }}</span>
+           </div>
+           {% endif %}
+        </div>
+
+        <!-- Special Messages -->
+        {% if order.payment_method == 'CASH' and order.status == 'UNPAID' %}
+        <div class="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-center">
+           <p class="text-[10px] font-black text-amber-700 uppercase tracking-widest leading-relaxed">
+             Please pay <span class="text-lg block mt-1">₹{{ order.total }}</span> at the counter to confirm.
+           </p>
+        </div>
+        {% endif %}
+
+        {% if order.payment_method == 'UPI' and order.status == 'UNPAID' %}
+        <div class="bg-brand-50 border border-brand-100 p-4 rounded-2xl text-center">
+           <p class="text-[10px] font-black text-brand-700 uppercase tracking-widest">Processing Payment...</p>
+           <p class="text-[9px] font-medium text-brand-600 mt-1">Your order will appear in the kitchen automatically.</p>
+        </div>
+        {% elif order.payment_method == 'UPI' and order.status == 'CANCELLED' %}
+        <div class="bg-rose-50 border border-rose-100 p-4 rounded-2xl text-center">
+           <p class="text-[10px] font-black text-rose-700 uppercase tracking-widest">Payment Failed</p>
+           <a href="/r/{{ restaurant.slug }}/" class="text-[10px] font-black text-rose-800 underline uppercase tracking-widest mt-2 block">Try Again</a>
+        </div>
+        {% endif %}
+
+        {% if order.status != 'UNPAID' and order.status != 'CANCELLED' %}
+        <div class="bg-slate-900 p-5 rounded-2xl text-white text-center shadow-xl shadow-slate-200">
+           <p class="text-[11px] font-black uppercase tracking-[0.2em]">Ready Soon</p>
+           <p class="text-[10px] font-medium text-white/50 mt-1 uppercase tracking-widest">We'll call your number</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <a href="/r/{{ restaurant.slug }}/" class="block w-full bg-white border-2 border-slate-200 text-slate-400 py-4 rounded-2xl text-center text-xs font-black uppercase tracking-widest hover:border-brand-300 hover:text-brand-800 transition-all active:scale-95">
+      Place Another Order
+    </a>
+
+    <p class="text-center text-[9px] font-bold text-slate-400 uppercase tracking-widest pt-4">Powered by {{ APP_NAME }}</p>
+  </div>
+
+</body>
+</html>

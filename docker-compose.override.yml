@@ -1,0 +1,29 @@
+# ============================================================================
+# Order-Flow - Development Docker Compose Overrides
+# ============================================================================
+# Automatically loaded by `docker compose up` alongside docker-compose.yml.
+# Provides hot-reload, debug mode, and direct port access for local dev.
+# ============================================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DJANGO_SETTINGS_MODULE=dineflow.settings.dev
+      - DEBUG=True
+    volumes:
+      - .:/app
+      - static_files:/app/staticfiles
+    ports:
+      - "8000:8000"
+    command: >
+      daphne --bind 0.0.0.0 --port 8000
+      --access-log - --proxy-headers
+      dineflow.asgi:application
+
+  # In dev mode, access Daphne directly — no Nginx needed
+  nginx:
+    profiles:
+      - production

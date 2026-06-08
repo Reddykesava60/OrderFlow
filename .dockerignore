@@ -1,0 +1,52 @@
+# ── Environment & Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ───────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# ── Django ───────────────────────────────────────────────────────────────────
+staticfiles/
+media/
+*.sqlite3
+*.log
+
+# ── Version Control ──────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/
+
+# ── Documentation & Reports ──────────────────────────────────────────────────
+docs/
+*.md
+!README.md
+PRODUCTION_READINESS_REPORT.md
+SECURITY_AUDIT.md
+PERFORMANCE_REVIEW.md
+SCALABILITY_REPORT.md
+RISK_REGISTER.md
+OPERATIONS_RUNBOOK.md
+INFRASTRUCTURE_REVIEW.md
+LAUNCH_CHECKLIST.md
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Tooling ──────────────────────────────────────────────────────────────────
+pip-audit-cache/
+node_modules/
+.coverage
+htmlcov/

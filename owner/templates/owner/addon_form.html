@@ -1,0 +1,71 @@
+<!-- owner/templates/owner/addon_form.html -->
+{% extends "owner/base.html" %}
+{% block title %}Edit Add-on{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto space-y-8" x-data="{ imagePreview: '{{ addon.image|default:'' }}' }">
+  
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Edit Add-on</h1>
+      <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">{{ addon.name }}</p>
+    </div>
+    <a href="{% url 'owner:menu' %}" class="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:text-slate-600 transition-all shadow-sm">
+       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+    </a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Add-on Details</h2>
+       
+       <div class="flex flex-col md:flex-row items-center gap-8 border-b border-slate-50 pb-8">
+          <div class="w-24 h-24 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden shrink-0 flex items-center justify-center relative">
+             <template x-if="imagePreview">
+                <img :src="imagePreview" class="w-full h-full object-cover">
+             </template>
+             <template x-if="!imagePreview">
+                <div class="text-2xl opacity-20">✨</div>
+             </template>
+          </div>
+          
+          <div class="flex-1 space-y-2 w-full">
+             <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Update Image</label>
+             <input type="file" name="image" accept="image/*" @change="imagePreview = URL.createObjectURL($event.target.files[0])"
+                    class="w-full text-[10px] text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200 cursor-pointer">
+          </div>
+       </div>
+
+       <div class="space-y-4">
+          <div class="space-y-2">
+             <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Add-on Name *</label>
+             <input type="text" name="name" value="{{ addon.name }}" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all">
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+             <div class="space-y-2">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Price (₹) *</label>
+                <input type="number" name="price" value="{{ addon.price }}" step="0.01" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black text-brand-800 focus:border-brand-300 outline-none transition-all">
+             </div>
+             <div class="space-y-2">
+                <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Max Qty / Item</label>
+                <input type="number" name="max_qty" value="{{ addon.max_qty }}" min="1" max="99" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all">
+             </div>
+          </div>
+
+          <div class="space-y-2">
+             <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Stock Inventory</label>
+             <input type="number" name="stock" value="{% if addon.stock != None %}{{ addon.stock }}{% endif %}" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all" placeholder="Leave blank for unlimited">
+          </div>
+       </div>
+    </div>
+
+    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 active:scale-95 transition-all">
+       Update Add-on
+    </button>
+  </form>
+</div>
+{% endblock %}

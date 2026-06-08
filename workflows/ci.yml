@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pip-audit
+
+      - name: Dependency vulnerability audit
+        run: python -m pip_audit -r requirements.txt --no-deps --progress-spinner off
+
+      - name: Dependency consistency
+        run: python -m pip check
+
+      - name: Django checks
+        run: |
+          python manage.py check --settings=dineflow.settings.test
+          python manage.py makemigrations --check --dry-run --settings=dineflow.settings.test
+
+      - name: Production settings check
+        env:
+          SECRET_KEY: ci-production-check-secret-with-more-than-fifty-characters-1234567890
+          ALLOWED_HOSTS: example.com,www.example.com
+          CSRF_TRUSTED_ORIGINS: https://example.com,https://www.example.com
+          REDIS_URL: redis://:ci-redis-password@redis:6379/0
+          DATABASE_URL: sqlite:///:memory:
+        run: python manage.py check --deploy --settings=dineflow.settings.prod
+
+      - name: Tests
+        run: python manage.py test core ordering kitchen owner --settings=dineflow.settings.test

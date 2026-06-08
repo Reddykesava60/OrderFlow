@@ -1,0 +1,95 @@
+<!-- owner/templates/owner/login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>{{ APP_NAME }} - Sign in</title>
+  
+  <!-- Tailwind & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              300: '#7cc8fb',
+              400: '#36abf7',
+              500: '#0c91eb',
+              600: '#0071c9',
+              700: '#005aa3',
+              800: '#1a3c5e',
+              900: '#0a233d',
+            },
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex items-center justify-center p-6">
+
+  <div class="w-full max-w-sm space-y-8">
+    <div class="text-center space-y-2">
+       <div class="inline-flex items-center justify-center w-16 h-16 bg-brand-800 text-white rounded-3xl shadow-2xl shadow-brand-200 text-2xl font-black mb-4">{{ APP_SHORT_NAME }}</div>
+       <h1 class="text-4xl font-black text-brand-900 tracking-tighter">{{ APP_NAME }}</h1>
+       <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ APP_TAGLINE }}</p>
+    </div>
+
+    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100 space-y-6">
+      <div>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Sign In</h2>
+        <p class="text-xs font-medium text-slate-400 mt-1">Access your restaurant dashboard</p>
+      </div>
+
+      {% if form.errors %}
+      <div class="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
+         <p class="text-[10px] font-black text-rose-600 uppercase tracking-widest text-center">Invalid username or password</p>
+      </div>
+      {% endif %}
+
+      <form method="post" class="space-y-4">
+        {% csrf_token %}
+        <div class="space-y-1.5">
+           <label for="id_username" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Username</label>
+           <input type="text" name="username" id="id_username" required autocomplete="username" autofocus
+                  class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all placeholder:text-slate-300"
+                  placeholder="e.g. owner_ravi">
+        </div>
+
+        <div class="space-y-1.5">
+           <label for="id_password" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Password</label>
+           <input type="password" name="password" id="id_password" required autocomplete="current-password"
+                  class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all placeholder:text-slate-300"
+                  placeholder="••••••••">
+        </div>
+
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all mt-4">
+          Authenticate
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+       &copy; 2026 {{ APP_NAME }} Platform
+    </p>
+  </div>
+
+</body>
+</html>

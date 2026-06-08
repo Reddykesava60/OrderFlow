@@ -1,0 +1,163 @@
+<!-- owner/templates/owner/config.html -->
+{% extends "owner/base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-8">
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Restaurant Settings</h1>
+      <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">Configuration & Controls</p>
+    </div>
+  </div>
+
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Operational Status Card -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Operational Status</h2>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" name="is_open" class="sr-only peer" {% if config.is_open %}checked{% endif %}>
+          <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+          <span class="ml-3 text-sm font-bold text-slate-700">Accepting Orders</span>
+        </label>
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closing Message</label>
+        <textarea name="reopen_message" rows="2" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-brand-100 focus:border-brand-300 transition-all outline-none" placeholder="e.g. We are closed for private event. Back at 7pm!">{{ config.reopen_message }}</textarea>
+      </div>
+    </div>
+
+    <!-- Payment Configuration Card -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+      <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Payment Gateways</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
+          <input type="checkbox" name="cash_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.cash_enabled %}checked{% endif %}>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold text-slate-800">Cash Payment</span>
+            <span class="text-[10px] font-medium text-slate-400 uppercase">Collect at counter</span>
+          </div>
+        </label>
+        
+        <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
+          <input type="checkbox" name="upi_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.upi_enabled %}checked{% endif %}>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold text-slate-800">UPI / Cards</span>
+            <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Via Razorpay</span>
+          </div>
+        </label>
+      </div>
+
+      <!-- Razorpay Detailed Setup -->
+      <div class="mt-4 p-5 bg-slate-900 rounded-3xl space-y-5 shadow-xl shadow-slate-200">
+        <div class="flex items-center justify-between">
+           <div class="flex items-center gap-2">
+              <span class="text-xs font-black text-white uppercase tracking-widest">Razorpay Setup</span>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase {% if payment_config.is_usable %}bg-emerald-500 text-white{% else %}bg-amber-500 text-white{% endif %}">
+                {% if payment_config.is_usable %}Connected{% else %}Incomplete{% endif %}
+              </span>
+           </div>
+           {% if payment_config.masked_key_id %}
+              <span class="text-[9px] font-bold text-slate-500" x-text="'ID: ' + '{{ payment_config.masked_key_id }}'"></span>
+           {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Account Label</label>
+            <input type="text" name="account_name" value="{{ payment_config.account_name }}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-medium text-white focus:border-brand-500 transition-all outline-none" placeholder="e.g. Primary Account">
+          </div>
+          <div class="flex items-end pb-1">
+             <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" name="razorpay_is_active" class="w-4 h-4 rounded border-white/20 bg-white/5 text-brand-500" {% if payment_config.is_active %}checked{% endif %}>
+                <span class="text-xs font-bold text-slate-300">Active for checkout</span>
+             </label>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Key ID</label>
+            <input type="text" name="razorpay_key_id" value="{{ payment_config.razorpay_key_id }}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="rzp_live_...">
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                Key Secret
+                {% if payment_config.razorpay_key_secret %}
+                <span class="text-emerald-500 lowercase ml-1">(set)</span>
+                {% else %}
+                <span class="text-rose-500 lowercase ml-1">(not set)</span>
+                {% endif %}
+              </label>
+              <input type="password" name="razorpay_key_secret" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="••••••••••••••••">
+            </div>
+            <div class="space-y-2">
+              <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                Webhook Secret
+                {% if payment_config.razorpay_webhook_secret %}
+                <span class="text-emerald-500 lowercase ml-1">(set)</span>
+                {% else %}
+                <span class="text-rose-500 lowercase ml-1">(not set)</span>
+                {% endif %}
+              </label>
+              <input type="password" name="razorpay_webhook_secret" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="••••••••••••••••">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR & Branding Card -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+      <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Branding & Access</h2>
+      
+      <div class="space-y-2">
+        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Custom URL Slug</label>
+        <div class="flex items-center gap-2">
+           <input type="text" name="slug" value="{{ restaurant.slug }}" class="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-brand-300" pattern="[a-z0-9\-]+" title="Lowercase letters, numbers, hyphens only">
+        </div>
+        <p class="text-[10px] font-bold text-slate-400">
+          Live URL:
+          <a href="{{ menu_public_url }}" class="text-brand-600 underline decoration-brand-200 underline-offset-2 transition hover:text-brand-800">
+            {{ menu_public_url }}
+          </a>
+        </p>
+      </div>
+
+      <div class="bg-brand-800 p-6 rounded-3xl text-white flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-brand-100">
+         <div class="w-24 h-24 bg-white p-2 rounded-2xl flex-shrink-0 flex items-center justify-center">
+            {% if restaurant.menu_qr_code_url %}
+               <img src="{{ restaurant.menu_qr_code_url }}" class="w-full h-full object-contain">
+            {% else %}
+               <svg class="w-12 h-12 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 8h2m12-4h2M4 4h2m4 4h2m-2 4h.01M4 16h2m4 4h2M6 12H4m16 8h.01M12 12h.01M4 20h.01"></path></svg>
+            {% endif %}
+         </div>
+         <div class="flex-1 text-center md:text-left">
+            <h3 class="text-lg font-black tracking-tight">Generate QR Menu</h3>
+            <p class="text-xs font-medium text-white/60 mt-1 uppercase tracking-widest">Print this for your tables</p>
+            <div class="mt-4 flex flex-wrap justify-center md:justify-start gap-3">
+               <a href="{% url 'owner:menu_qr_download' %}" class="bg-white text-brand-800 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg active:scale-95">
+                  Download QR
+               </a>
+               {% if restaurant.menu_qr_code_url %}
+               <a href="{{ restaurant.menu_qr_code_url }}" target="_blank" class="px-4 py-2.5 text-xs font-bold text-white/80 hover:text-white transition-all underline">View Public Image</a>
+               {% endif %}
+            </div>
+         </div>
+      </div>
+    </div>
+
+    <div class="pt-4 sticky bottom-6 z-40 md:static">
+      <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-brand-200 hover:bg-brand-900 active:scale-95 transition-all">
+        Apply Changes
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

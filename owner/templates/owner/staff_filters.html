@@ -1,0 +1,115 @@
+{% extends "owner/base.html" %}
+{% block title %}Station Filters{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-8" x-data="{ editing: null }">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">KDS Station Filters</h1>
+      <p class="mt-1 text-sm font-medium text-slate-400">Create owner-defined station groups and use them consistently across Kitchen, Preparing, and All Orders.</p>
+    </div>
+    <a href="{% url 'owner:menu' %}" class="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-700">
+      <span>&larr;</span>
+      Back to menu
+    </a>
+  </div>
+
+  <section class="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
+    <div class="mb-6">
+      <h2 class="text-lg font-black text-slate-900">Create station filter</h2>
+      <p class="mt-1 text-sm text-slate-400">Each filter is a reusable station view powered by the menu items linked below.</p>
+    </div>
+    <form method="post" action="{% url 'owner:staff_filters' %}" class="space-y-5">
+      {% csrf_token %}
+      <div>
+        <label class="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-400">Station name *</label>
+        <input type="text" name="name" required placeholder="e.g. Rice Station" class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-brand-300 focus:bg-white">
+      </div>
+      <div>
+        <label class="mb-3 block text-[11px] font-black uppercase tracking-widest text-slate-400">Linked items</label>
+        <div class="grid gap-3 sm:grid-cols-2">
+          {% for item in menu_items %}
+          <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <input type="checkbox" name="item_ids" value="{{ item.id }}" class="h-4 w-4 rounded border-slate-300 text-brand-600">
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-bold text-slate-800">{{ item.name }}</span>
+              <span class="mt-0.5 block text-xs text-slate-400">{{ item.item_type.name|default:"Uncategorized" }}</span>
+            </span>
+          </label>
+          {% empty %}
+          <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-400">Add menu items first to build a station filter.</div>
+          {% endfor %}
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded-3xl bg-brand-800 px-6 py-4 text-sm font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-brand-100 transition active:scale-[0.98] sm:w-auto">
+        Create station filter
+      </button>
+    </form>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-black text-slate-900">Existing filters</h2>
+    {% if filters %}
+      <div class="grid gap-4 lg:grid-cols-2">
+        {% for filter in filters %}
+        <article class="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-black text-slate-900">{{ filter.name }}</h3>
+              <p class="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">{{ filter.items.count }} linked item{{ filter.items.count|pluralize }}</p>
+            </div>
+            <form method="post" action="{% url 'owner:staff_filter_delete' filter.id %}" onsubmit="return confirm('Delete {{ filter.name }}?')" class="m-0">
+              {% csrf_token %}
+              <button type="submit" class="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700">Delete</button>
+            </form>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            {% for item in filter.items.all %}
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">{{ item.name }}</span>
+            {% empty %}
+              <span class="text-sm text-slate-400">No items assigned yet.</span>
+            {% endfor %}
+          </div>
+
+          <button type="button"
+                  class="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-slate-700"
+                  @click="editing = '{{ filter.id }}'">
+            Edit filter
+          </button>
+
+          <div x-show="editing === '{{ filter.id }}'" x-cloak class="mt-5 border-t border-slate-100 pt-5">
+            <form method="post" action="{% url 'owner:staff_filter_edit' filter.id %}" class="space-y-4">
+              {% csrf_token %}
+              <div>
+                <label class="mb-2 block text-[11px] font-black uppercase tracking-widest text-slate-400">Station name</label>
+                <input type="text" name="name" value="{{ filter.name }}" required class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-brand-300 focus:bg-white">
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                {% for item in menu_items %}
+                <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <input type="checkbox" name="item_ids" value="{{ item.id }}" {% if item in filter.items.all %}checked{% endif %} class="h-4 w-4 rounded border-slate-300 text-brand-600">
+                  <span class="min-w-0">
+                    <span class="block truncate text-sm font-bold text-slate-800">{{ item.name }}</span>
+                    <span class="mt-0.5 block text-xs text-slate-400">{{ item.item_type.name|default:"Uncategorized" }}</span>
+                  </span>
+                </label>
+                {% endfor %}
+              </div>
+              <div class="flex flex-col gap-3 sm:flex-row">
+                <button type="submit" class="rounded-2xl bg-brand-800 px-5 py-3 text-[11px] font-black uppercase tracking-widest text-white">Save changes</button>
+                <button type="button" class="rounded-2xl border border-slate-200 px-5 py-3 text-[11px] font-black uppercase tracking-widest text-slate-600" @click="editing = null">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm font-medium text-slate-400">
+        No station filters yet.
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

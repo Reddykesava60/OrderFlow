@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>KDS - {{ restaurant.name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              500: '#0c91eb',
+              700: '#005aa3',
+              800: '#1a3c5e',
+              900: '#0a233d',
+            },
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    body { -webkit-tap-highlight-color: transparent; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900" x-data="kds()" x-init="init()">
+  <div class="flex min-h-screen flex-col">
+    <header class="sticky top-0 z-40 border-b border-slate-200 bg-brand-800 text-white shadow-sm">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 md:px-6">
+        <div class="min-w-0">
+          <div class="truncate text-lg font-black">{{ restaurant.name }}</div>
+          <div class="mt-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-brand-100">
+            <span>{{ user.username }}</span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1">
+              <span class="h-2 w-2 rounded-full" :class="online ? 'bg-emerald-400' : 'bg-rose-400'"></span>
+              <span x-text="online ? 'Live' : 'Offline'"></span>
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          {% if user.is_owner %}
+          <a href="{% url 'owner:dashboard' %}" class="inline-flex items-center rounded-2xl bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-white/20 sm:px-4 sm:text-xs">Owner</a>
+          {% endif %}
+          <form method="post" action="{% url 'owner:logout' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="text-[10px] font-black uppercase tracking-widest text-white/80 transition hover:text-white sm:text-xs">Logout</button>
+          </form>
+        </div>
+      </div>
+
+      <div x-show="newOrderBanner" x-cloak class="border-t border-white/10 bg-brand-700 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.18em] text-white">
+        New order received
+      </div>
+    </header>
+
+    <nav class="hidden border-b border-slate-200 bg-white md:block">
+      <div class="mx-auto flex max-w-6xl items-stretch">
+        <button class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
+                :class="tab === 'kitchen' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
+                @click="tab = 'kitchen'">
+          Kitchen <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.kitchen > 0" x-text="counts.kitchen"></span>
+        </button>
+        <button class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
+                :class="tab === 'preparing' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
+                @click="tab = 'preparing'">
+          Preparing <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.preparing > 0" x-text="counts.preparing"></span>
+        </button>
+        <button x-show="canCollect" class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
+                :class="tab === 'payments' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
+                @click="tab = 'payments'">
+          Payments <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.payments > 0" x-text="counts.payments"></span>
+        </button>
+        <button x-show="canViewAll" class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
+                :class="tab === 'all_orders' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
+                @click="tab = 'all_orders'">
+          All Orders <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.all_orders > 0" x-text="counts.all_orders"></span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="border-b border-slate-200 bg-white" x-show="loaded && (tab === 'kitchen' || tab === 'preparing' || tab === 'all_orders')" x-cloak>
+      <div class="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 md:px-6 hide-scrollbar">
+        <button class="whitespace-nowrap rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-widest transition"
+                :class="selectedFilter === 'all' ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                @click="selectedFilter = 'all'">
+          All Stations
+        </button>
+        <template x-for="filter in staffFilters" :key="filter.id">
+          <button class="whitespace-nowrap rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-widest transition"
+                  :class="selectedFilter === filter.id ? 'border-brand-800 bg-brand-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                  @click="selectedFilter = filter.id"
+                  x-text="filter.name"></button>
+        </template>
+      </div>
+    </div>
+
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-28 md:px-6 md:pb-8">
+      <div class="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h1 class="text-xl font-black tracking-tight text-slate-900" x-text="{ kitchen: 'Kitchen Queue', preparing: 'Preparing Now', payments: 'Pending Payments', all_orders: 'All Orders Today' }[tab]"></h1>
+          <p class="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Auto-updates every 5s</p>
+        </div>
+      </div>
+
+      <div x-show="!loaded" class="flex flex-col items-center justify-center py-24" x-cloak>
+        <div class="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-700"></div>
+        <p class="mt-4 text-sm font-bold uppercase tracking-widest text-slate-400">Synchronizing</p>
+      </div>
+
+      <section x-show="tab === 'kitchen' && loaded" x-cloak class="space-y-4">
+        <template x-for="order in filteredOrders(kitchen)" :key="order.id">
+          <article class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-800 text-lg font-black text-white" x-text="order.order_number"></div>
+                <div>
+                  <div class="text-lg font-black text-slate-900" x-text="order.customer"></div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                    <span x-show="order.table" x-text="'Table ' + order.table"></span>
+                    <span x-show="order.table">.</span>
+                    <span x-text="timeAgo(order.created_at)"></span>
+                  </div>
+                </div>
+              </div>
+              <button x-show="canBulkUpdate"
+                      class="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-brand-700 transition hover:bg-brand-100"
+                      :disabled="isLoading('bulk-start-' + order.id)"
+                      @click="startAll(order.id)">
+                <span x-text="isLoading('bulk-start-' + order.id) ? 'Processing...' : 'Start All'"></span>
+              </button>
+            </div>
+
+            <div class="divide-y divide-slate-100">
+              <template x-for="unit in order.visible_work_units" :key="unit.id">
+                <div class="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between"
+                     :class="unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-brand-100'">
+                  <div class="flex min-w-0 flex-1 gap-4">
+                    <div class="h-16 w-16 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                      <template x-if="unit.image_url">
+                        <img :src="unit.image_url" class="h-full w-full object-cover" alt="">
+                      </template>
+                      <template x-if="!unit.image_url">
+                        <div class="flex h-full w-full items-center justify-center text-[10px] font-black uppercase text-slate-300">No image</div>
+                      </template>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-black text-slate-900" x-text="unit.name"></h2>
+                        <span class="text-base font-black text-amber-600" x-text="'x' + unit.qty"></span>
+                        <span x-show="unit.is_parcel" class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
+                          <span aria-hidden="true">&#128717;</span>
+                          Parcel
+                        </span>
+                      </div>
+                      <div class="mt-1 text-[11px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500" x-text="unit.category_name || 'General'"></span>
+                        <span x-show="unit.has_addons" class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">Add-ons</span>
+                        <span x-show="unit.spice_level" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                          <template x-for="count in spiceIconCount(unit.spice_level)" :key="count">
+                            <span aria-hidden="true">&#127798;</span>
+                          </template>
+                          <span x-text="unit.spice_level"></span>
+                        </span>
+                      </div>
+                      <div x-show="unit.attached_addons && unit.attached_addons.length > 0" class="mt-4 space-y-2 rounded-2xl border border-emerald-100 bg-slate-50/80 p-3">
+                        <template x-for="addon in unit.attached_addons" :key="addon.id">
+                          <div class="flex items-center justify-between gap-3 text-xs">
+                            <div class="min-w-0 font-bold text-slate-700" x-text="addon.name + ' x' + addon.qty"></div>
+                            <span class="rounded-full bg-brand-50 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-brand-700" x-text="addon.status"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                  <button x-show="canComplete"
+                          class="w-full rounded-2xl bg-brand-800 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg shadow-brand-100 transition active:scale-[0.98] md:w-auto"
+                          :disabled="isLoading('start-' + unit.kind + '-' + unit.id)"
+                          @click="startWork(unit)">
+                    <span x-text="isLoading('start-' + unit.kind + '-' + unit.id) ? 'Wait...' : 'Start Prep'"></span>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </article>
+        </template>
+
+        <div x-show="filteredOrders(kitchen).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+          No pending orders
+        </div>
+      </section>
+
+      <section x-show="tab === 'preparing' && loaded" x-cloak class="space-y-4">
+        <template x-for="order in filteredOrders(preparing)" :key="order.id">
+          <article class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-4 border-b border-slate-100 bg-amber-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-600 text-lg font-black text-white" x-text="order.order_number"></div>
+                <div>
+                  <div class="text-lg font-black text-slate-900" x-text="order.customer"></div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                    <span x-show="order.table" x-text="'Table ' + order.table"></span>
+                    <span x-show="order.table">.</span>
+                    <span x-text="timeAgo(order.created_at)"></span>
+                  </div>
+                </div>
+              </div>
+              <button x-show="canBulkUpdate"
+                      class="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-emerald-700 transition hover:bg-emerald-100"
+                      :disabled="isLoading('bulk-done-' + order.id)"
+                      @click="completeAll(order.id)">
+                <span x-text="isLoading('bulk-done-' + order.id) ? 'Wait...' : 'Complete All'"></span>
+              </button>
+            </div>
+
+            <div class="divide-y divide-slate-100">
+              <template x-for="unit in order.visible_work_units" :key="unit.id">
+                <div class="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between"
+                     :class="unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-amber-200'">
+                  <div class="flex min-w-0 flex-1 gap-4">
+                    <div class="h-16 w-16 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                      <template x-if="unit.image_url">
+                        <img :src="unit.image_url" class="h-full w-full object-cover" alt="">
+                      </template>
+                      <template x-if="!unit.image_url">
+                        <div class="flex h-full w-full items-center justify-center text-[10px] font-black uppercase text-slate-300">No image</div>
+                      </template>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-black text-slate-900" x-text="unit.name"></h2>
+                        <span class="text-base font-black text-amber-600" x-text="'x' + unit.qty"></span>
+                        <span x-show="unit.is_parcel" class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
+                          <span aria-hidden="true">&#128717;</span>
+                          Parcel
+                        </span>
+                      </div>
+                      <div class="mt-1 text-[11px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500" x-text="unit.category_name || 'General'"></span>
+                        <span x-show="unit.has_addons" class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">Add-ons</span>
+                        <span x-show="unit.spice_level" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                          <template x-for="count in spiceIconCount(unit.spice_level)" :key="count">
+                            <span aria-hidden="true">&#127798;</span>
+                          </template>
+                          <span x-text="unit.spice_level"></span>
+                        </span>
+                      </div>
+                      <div x-show="unit.attached_addons && unit.attached_addons.length > 0" class="mt-4 space-y-2 rounded-2xl border border-emerald-100 bg-slate-50/80 p-3">
+                        <template x-for="addon in unit.attached_addons" :key="addon.id">
+                          <div class="flex items-center justify-between gap-3 text-xs">
+                            <div class="min-w-0 font-bold text-slate-700" x-text="addon.name + ' x' + addon.qty"></div>
+                            <span class="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-700" x-text="addon.status"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                  <button x-show="canComplete"
+                          class="w-full rounded-2xl bg-emerald-600 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg shadow-emerald-100 transition active:scale-[0.98] md:w-auto"
+                          :disabled="isLoading('done-' + unit.kind + '-' + unit.id)"
+                          @click="completeWork(unit)">
+                    <span x-text="isLoading('done-' + unit.kind + '-' + unit.id) ? 'Wait...' : 'Mark Done'"></span>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </article>
+        </template>
+
+        <div x-show="filteredOrders(preparing).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+          Nothing currently preparing
+        </div>
+      </section>
+
+      <section x-show="tab === 'payments' && loaded" x-cloak class="grid gap-4 lg:grid-cols-2">
+        <template x-for="order in payments" :key="order.id">
+          <article class="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-lg font-black text-white" x-text="order.order_number"></div>
+                <div>
+                  <div class="text-lg font-black text-slate-900" x-text="order.customer"></div>
+                  <div class="mt-1 text-[11px] font-bold uppercase tracking-widest text-slate-400" x-show="order.table" x-text="'Table ' + order.table"></div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xl font-black text-brand-800" x-text="'Rs ' + order.total"></div>
+                <div class="mt-1 text-[10px] font-black uppercase tracking-widest" :class="paymentTimeMetaClass(order)" x-text="paymentTimeMeta(order)"></div>
+              </div>
+            </div>
+
+            <div class="mt-5 space-y-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <template x-for="item in order.items" :key="item.id">
+                <div class="flex items-center justify-between gap-3 text-sm font-bold text-slate-600">
+                  <span x-text="item.qty + 'x ' + item.name"></span>
+                  <span x-show="item.is_parcel" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
+                    &#128717;
+                  </span>
+                </div>
+              </template>
+            </div>
+
+            <button x-show="canCollect"
+                    class="mt-5 w-full rounded-2xl bg-brand-800 px-6 py-4 text-sm font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-brand-100 transition active:scale-[0.98]"
+                    :disabled="isLoading('cash-' + order.id)"
+                    @click="collectCash(order.id)">
+              <span x-text="isLoading('cash-' + order.id) ? 'Collecting...' : 'Collect Cash'"></span>
+            </button>
+          </article>
+        </template>
+
+        <div x-show="payments.length === 0" class="lg:col-span-2 rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+          No pending cash collections
+        </div>
+      </section>
+
+      <section x-show="tab === 'all_orders' && loaded" x-cloak class="space-y-4">
+        <template x-for="order in filteredAllOrders(allOrders)" :key="order.id">
+          <article class="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex items-center gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-sm font-black text-slate-700" x-text="order.order_number"></div>
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-lg font-black text-slate-900" x-text="order.customer"></span>
+                  </div>
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                    <span x-text="timeAgo(order.created_at)"></span>
+                    <span>.</span>
+                    <span x-text="order.payment_method"></span>
+                    <span x-show="order.table">.</span>
+                    <span x-show="order.table" x-text="'Table ' + order.table"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-lg font-black text-brand-800" x-text="'Rs ' + order.total"></div>
+                <span class="mt-1 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest" :class="statusBadgeClass(order.status)" x-text="order.status"></span>
+              </div>
+            </div>
+
+            <div class="mt-4 grid gap-3">
+              <template x-for="item in order.visible_items" :key="item.id">
+                <div class="rounded-2xl border p-4"
+                     :class="item.has_addons ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200 bg-slate-50/50'">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm font-black text-slate-900" x-text="item.name"></span>
+                        <span class="text-sm font-black text-amber-600" x-text="'x' + item.qty"></span>
+                        <span x-show="item.is_parcel" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">&#128717; Parcel</span>
+                      </div>
+                      <div class="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span x-text="item.dining_option_label"></span>
+                        <span x-show="item.spice_level" class="inline-flex items-center gap-1">
+                          <template x-for="count in spiceIconCount(item.spice_level)" :key="count">
+                            <span aria-hidden="true">&#127798;</span>
+                          </template>
+                          <span x-text="item.spice_level"></span>
+                        </span>
+                      </div>
+                    </div>
+                    <span class="inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest" :class="statusBadgeClass(item.status)" x-text="item.status"></span>
+                  </div>
+                  <div x-show="item.visible_addons && item.visible_addons.length > 0" class="mt-3 space-y-2 rounded-2xl border border-emerald-100 bg-white/70 p-3">
+                    <template x-for="addon in item.visible_addons" :key="addon.id">
+                      <div class="flex items-center justify-between gap-3 text-xs">
+                        <div class="font-bold text-slate-700" x-text="addon.name + ' x' + addon.qty"></div>
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-600" x-text="addon.status"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </article>
+        </template>
+
+        <div x-show="filteredAllOrders(allOrders).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+          No orders match this station
+        </div>
+      </section>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-1 backdrop-blur-xl md:hidden safe-bottom">
+      <div class="flex items-stretch justify-between gap-1">
+        <button class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
+                :class="tab === 'kitchen' ? 'bg-brand-50 text-brand-700' : 'text-slate-400'"
+                @click="tab = 'kitchen'">
+          <span>Kitchen</span>
+          <span x-show="counts.kitchen > 0" class="mt-1 rounded-full bg-brand-100 px-2 py-0.5 text-[9px]" x-text="counts.kitchen"></span>
+        </button>
+        <button class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
+                :class="tab === 'preparing' ? 'bg-brand-50 text-brand-700' : 'text-slate-400'"
+                @click="tab = 'preparing'">
+          <span>Prep</span>
+          <span x-show="counts.preparing > 0" class="mt-1 rounded-full bg-brand-100 px-2 py-0.5 text-[9px]" x-text="counts.preparing"></span>
+        </button>
+        <button x-show="canCollect" class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
+                :class="tab === 'payments' ? 'bg-brand-50 text-brand-700' : 'text-slate-400'"
+                @click="tab = 'payments'">
+          <span>Pay</span>
+          <span x-show="counts.payments > 0" class="mt-1 rounded-full bg-brand-100 px-2 py-0.5 text-[9px]" x-text="counts.payments"></span>
+        </button>
+        <button x-show="canViewAll" class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
+                :class="tab === 'all_orders' ? 'bg-brand-50 text-brand-700' : 'text-slate-400'"
+                @click="tab = 'all_orders'">
+          <span>All</span>
+          <span x-show="counts.all_orders > 0" class="mt-1 rounded-full bg-brand-100 px-2 py-0.5 text-[9px]" x-text="counts.all_orders"></span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <div x-show="toastMsg" x-cloak class="fixed bottom-24 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 px-4">
+    <div class="rounded-2xl border px-5 py-4 text-center text-sm font-black uppercase tracking-widest shadow-2xl"
+         :class="toastType === 'success' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-rose-500 bg-rose-600 text-white'">
+      <span x-text="toastMsg"></span>
+    </div>
+  </div>
+
+  <script>
+    const CSRF = "{{ csrf_token }}";
+
+    function kds() {
+      return {
+        tab: 'kitchen',
+        staffFilters: [],
+        selectedFilter: 'all',
+        kitchen: [],
+        preparing: [],
+        payments: [],
+        allOrders: [],
+        counts: { kitchen: 0, preparing: 0, payments: 0, all_orders: 0 },
+        cashTimeoutMinutes: 10,
+        loaded: false,
+        online: true,
+        failCount: 0,
+        newOrderBanner: false,
+        knownOrderIds: new Set(),
+        canComplete: false,
+        canCollect: false,
+        canViewAll: false,
+        canBulkUpdate: false,
+        pollTimer: null,
+        nowTickTimer: null,
+        nowMs: Date.now(),
+        toastMsg: '',
+        toastType: 'error',
+        pendingActions: {},
+        ws: null,
+        reconnectTimer: null,
+
+        init() {
+          this.poll();
+          this.nowTickTimer = setInterval(() => { this.nowMs = Date.now(); }, 1000);
+          this.connectWebSocket();
+          
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              this.poll();
+              if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                this.connectWebSocket();
+              }
+            }
+          });
+        },
+
+        connectWebSocket() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = protocol + '//' + window.location.host + '/ws/kds/';
+          
+          if (this.ws) {
+            this.ws.close();
+          }
+          
+          this.ws = new WebSocket(wsUrl);
+          
+          this.ws.onopen = () => {
+            console.log('KDS WebSocket connected');
+            this.online = true;
+          };
+          
+          this.ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.action === 'refresh') {
+              // Add 0-500ms randomized jitter to prevent thundering herd
+              setTimeout(() => this.poll(), Math.random() * 500);
+            }
+          };
+          
+          this.ws.onclose = () => {
+            console.log('KDS WebSocket disconnected');
+            this.online = false;
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = setTimeout(() => {
+              if (document.visibilityState === 'visible') {
+                this.connectWebSocket();
+              }
+            }, 3000);
+          };
+          
+          this.ws.onerror = (err) => {
+            console.error('KDS WebSocket error', err);
+            this.ws.close();
+          };
+        },
+
+        showToast(msg, type) {
+          this.toastMsg = msg;
+          this.toastType = type || 'error';
+          setTimeout(() => { this.toastMsg = ''; }, 3500);
+        },
+
+        isLoading(actionKey) {
+          return !!this.pendingActions[actionKey];
+        },
+
+        async withLoading(actionKey, fn) {
+          if (this.pendingActions[actionKey]) return;
+          this.pendingActions[actionKey] = true;
+          try {
+            await fn();
+            // On success, we generally rely on poll() to rebuild the DOM.
+            // Keeping it true prevents ghost clicks before the DOM removes the element.
+          } catch (e) {
+            this.pendingActions[actionKey] = false;
+            throw e;
+          }
+        },
+
+        filterItemIds() {
+          const activeFilter = this.staffFilters.find((filter) => filter.id === this.selectedFilter);
+          return new Set((activeFilter && activeFilter.item_ids) ? activeFilter.item_ids : []);
+        },
+
+        filteredOrders(orders) {
+          const activeFilterItems = this.filterItemIds();
+          return orders
+            .filter((order) => (
+              this.selectedFilter === 'all'
+              || order.menu_item_ids.some((itemId) => activeFilterItems.has(itemId))
+            ))
+            .map((order) => ({
+              ...order,
+              visible_work_units: this.selectedFilter === 'all'
+                ? (order.work_units || [])
+                : (order.work_units || []).filter((unit) => unit.menu_item_id && activeFilterItems.has(unit.menu_item_id)),
+            }))
+            .filter((order) => order.visible_work_units.length > 0);
+        },
+
+        filteredAllOrders(orders) {
+          const activeFilterItems = this.filterItemIds();
+          return orders
+            .map((order) => ({
+              ...order,
+              visible_items: this.selectedFilter === 'all'
+                ? (order.items || []).map((item) => ({ ...item, visible_addons: item.addons || [] }))
+                : (order.items || [])
+                    .filter((item) => item.menu_item_id && activeFilterItems.has(item.menu_item_id))
+                    .map((item) => ({ ...item, visible_addons: item.addons || [] })),
+            }))
+            .filter((order) => order.visible_items.length > 0);
+        },
+
+        async poll() {
+          try {
+            const res = await fetch("{% url 'kitchen:poll' %}", { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Request failed');
+            const data = await res.json();
+
+            const incoming = [
+              ...data.kitchen.map((o) => o.id),
+              ...data.preparing.map((o) => o.id),
+              ...data.payments.map((o) => o.id),
+              ...(data.all_orders || []).map((o) => o.id),
+            ];
+            const firstLoad = this.knownOrderIds.size === 0 && !this.loaded;
+            let hasNew = false;
+            for (const id of incoming) {
+              if (!this.knownOrderIds.has(id)) {
+                if (!firstLoad) hasNew = true;
+                this.knownOrderIds.add(id);
+              }
+            }
+
+            if (hasNew) {
+              this.newOrderBanner = true;
+              setTimeout(() => { this.newOrderBanner = false; }, 3500);
+            }
+
+            this.staffFilters = data.staff_filters || [];
+            this.cashTimeoutMinutes = Number(data.cash_timeout_minutes || 10);
+            if (this.selectedFilter !== 'all' && !this.staffFilters.some((filter) => filter.id === this.selectedFilter)) {
+              this.selectedFilter = 'all';
+            }
+
+            this.kitchen = data.kitchen || [];
+            this.preparing = data.preparing || [];
+            // Filter out CANCELLED/timed-out orders from payments immediately
+            this.payments = (data.payments || []).filter((o) => {
+              const expiresAt = new Date(o.created_at).getTime() + (Number(data.cash_timeout_minutes || 10) * 60 * 1000);
+              return expiresAt > Date.now();
+            });
+            this.allOrders = data.all_orders || [];
+            this.counts = data.tab_counts || this.counts;
+            this.canComplete = !!data.permissions.can_complete;
+            this.canCollect = !!data.permissions.can_collect;
+            this.canViewAll = !!data.permissions.can_view_all;
+            this.canBulkUpdate = !!data.permissions.can_bulk_update;
+
+            if (!this.canCollect && this.tab === 'payments') this.tab = 'kitchen';
+            if (!this.canViewAll && this.tab === 'all_orders') this.tab = 'kitchen';
+
+            this.loaded = true;
+            this.online = true;
+            this.failCount = 0;
+          } catch (error) {
+            this.failCount += 1;
+            if (this.failCount >= 2) this.online = false;
+          }
+        },
+
+        async doPost(url) {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+          });
+          const body = await res.text();
+          if (!res.ok) {
+            let message = 'Request failed (' + res.status + ')';
+            try {
+              const parsed = JSON.parse(body);
+              message = parsed.message || parsed.error || message;
+            } catch (error) {}
+            throw new Error(message);
+          }
+          return JSON.parse(body);
+        },
+
+        startUrl(unit) {
+          return unit.kind === 'addon'
+            ? '/api/addon/' + unit.id + '/start-prep/'
+            : '/api/item/' + unit.id + '/start-prep/';
+        },
+
+        completeUrl(unit) {
+          return unit.kind === 'addon'
+            ? '/api/addon/' + unit.id + '/complete/'
+            : '/api/item/' + unit.id + '/complete/';
+        },
+
+        async startAll(orderId) {
+          await this.withLoading('bulk-start-' + orderId, async () => {
+            try {
+              await this.doPost('/api/order/' + orderId + '/start-prep/');
+              this.showToast('Order moved to preparing', 'success');
+              await this.poll();
+            } catch (error) {
+              this.showToast('Error: ' + error.message, 'error');
+              throw error;
+            }
+          });
+        },
+
+        async completeAll(orderId) {
+          await this.withLoading('bulk-done-' + orderId, async () => {
+            try {
+              await this.doPost('/api/order/' + orderId + '/complete-all/');
+              this.showToast('Order completed', 'success');
+              await this.poll();
+            } catch (error) {
+              this.showToast('Error: ' + error.message, 'error');
+              throw error;
+            }
+          });
+        },
+
+        async collectCash(orderId) {
+          await this.withLoading('cash-' + orderId, async () => {
+            try {
+              await this.doPost('/api/cash/' + orderId + '/collect/');
+              this.showToast('Cash collected. Order moved to kitchen.', 'success');
+              await this.poll();
+            } catch (error) {
+              this.showToast('Error: ' + error.message, 'error');
+              throw error;
+            }
+          });
+        },
+
+        async startWork(unit) {
+          const key = 'start-' + unit.kind + '-' + unit.id;
+          await this.withLoading(key, async () => {
+            try {
+              await this.doPost(this.startUrl(unit));
+              this.showToast('Prep started', 'success');
+              await this.poll();
+            } catch (error) {
+              this.showToast('Error: ' + error.message, 'error');
+              throw error;
+            }
+          });
+        },
+
+        async completeWork(unit) {
+          const key = 'done-' + unit.kind + '-' + unit.id;
+          await this.withLoading(key, async () => {
+            try {
+              await this.doPost(this.completeUrl(unit));
+              this.showToast('Marked done', 'success');
+              await this.poll();
+            } catch (error) {
+              this.showToast('Error: ' + error.message, 'error');
+              throw error;
+            }
+          });
+        },
+
+        spiceIconCount(level) {
+          const normalized = String(level || '').trim().toLowerCase();
+          if (!normalized) return 0;
+          if (normalized === 'mild' || normalized === 'low') return 1;
+          if (normalized === 'medium') return 2;
+          if (normalized === 'hot') return 3;
+          return 0;
+        },
+
+        statusBadgeClass(status) {
+          return {
+            PENDING: 'bg-amber-50 text-amber-700',
+            PREPARING: 'bg-brand-50 text-brand-700',
+            PREP_STARTED: 'bg-brand-50 text-brand-700',
+            COMPLETED: 'bg-emerald-50 text-emerald-700',
+            UNPAID: 'bg-amber-50 text-amber-700',
+            CANCELLED: 'bg-rose-50 text-rose-700',
+          }[status] || 'bg-slate-100 text-slate-600';
+        },
+
+        paymentTimeMeta(order) {
+          const expiresAt = new Date(order.created_at).getTime() + (this.cashTimeoutMinutes * 60 * 1000);
+          const remainingMs = expiresAt - this.nowMs;
+          if (remainingMs <= 0) return 'Timeout';
+          const totalSeconds = Math.ceil(remainingMs / 1000);
+          const mins = Math.floor(totalSeconds / 60);
+          const secs = totalSeconds % 60;
+          return 'Expires in ' + mins + 'm ' + String(secs).padStart(2, '0') + 's';
+        },
+
+        paymentTimeMetaClass(order) {
+          const expiresAt = new Date(order.created_at).getTime() + (this.cashTimeoutMinutes * 60 * 1000);
+          const remainingMs = expiresAt - this.nowMs;
+          if (remainingMs <= 0) return 'text-rose-600';
+          if (remainingMs <= 2 * 60 * 1000) return 'text-amber-600';
+          return 'text-slate-400';
+        },
+
+        timeAgo(iso) {
+          const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+          if (diff < 1) return 'Just now';
+          if (diff === 1) return '1m ago';
+          return diff + 'm ago';
+        },
+      };
+    }
+  </script>
+</body>
+</html>
