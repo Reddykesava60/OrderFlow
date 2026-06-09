@@ -141,6 +141,37 @@ class PlatformFeePolicyTests(TestCase):
 
         self.assertEqual(fee_record.fee_amount, Decimal('12.00'))
 
+    def test_restaurant_commission_override_used_instead_of_platform_settings(self):
+        settings_obj = PlatformSettings.get_solo()
+        settings_obj.platform_fee_mode = PlatformSettings.FeeMode.FIXED
+        settings_obj.platform_fee_fixed_amount = Decimal('12.00')
+        settings_obj.platform_fee_percent = Decimal('3.00')
+        settings_obj.save(update_fields=['platform_fee_mode', 'platform_fee_fixed_amount', 'platform_fee_percent'])
+
+        # Set commission_rate on restaurant to 4.00%
+        self.restaurant.commission_rate = Decimal('4.00')
+        self.restaurant.save(update_fields=['commission_rate'])
+
+        order = place_cash_order(
+            self.restaurant,
+            cart_lines=[
+                {
+                    'item_id': str(self.item.id),
+                    'quantity': 1,
+                    'dining_option': 'DINE_IN',
+                    'addons': [],
+                }
+            ],
+            customer_name='Ravi',
+            table_number='C3',
+        )
+
+        confirm_cash_payment(order, self.user)
+        fee_record = PlatformFeeRecord.objects.get(order=order)
+
+        # Order total is 80.00. 4.00% of 80.00 is 3.20.
+        self.assertEqual(fee_record.fee_amount, Decimal('3.20'))
+
 
 class TestUpiWebhook(TestCase):
     def setUp(self):

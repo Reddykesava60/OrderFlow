@@ -37,11 +37,19 @@ def _clean(value):
     return bleach.clean(value or '', tags=[], strip=True).strip()
 
 
-def _compute_platform_fee(order_total):
+def _compute_platform_fee(order_total, restaurant=None):
     """
     Compute platform fee according to platform settings policy.
     Returns (fee_amount, fee_rate_snapshot).
     """
+    if restaurant and restaurant.commission_rate is not None:
+        fee_rate = Decimal(restaurant.commission_rate)
+        fee_amount = (order_total * fee_rate / Decimal('100')).quantize(
+            TWO_PLACES,
+            rounding=ROUND_HALF_UP,
+        )
+        return fee_amount, fee_rate
+
     settings_obj = PlatformSettings.get_solo()
 
     if settings_obj.platform_fee_mode == PlatformSettings.FeeMode.FIXED:
@@ -657,7 +665,7 @@ def _create_order_rows(restaurant, priced_lines, total, customer_name,
 
 def _create_fee_record(order, restaurant):
     """Create PlatformFeeRecord for a confirmed payment. Call inside transaction.atomic()."""
-    fee_amount, fee_rate = _compute_platform_fee(order.total)
+    fee_amount, fee_rate = _compute_platform_fee(order.total, restaurant=restaurant)
 
     PlatformFeeRecord.objects.create(
         order             = order,
