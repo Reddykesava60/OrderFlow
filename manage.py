@@ -6,8 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    # manage.py  — change this line only
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dineflow.settings.dev')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
