@@ -63,7 +63,7 @@
     
     <button class="bg-accent text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-3 transition-all active:scale-95 shadow-lg shadow-accent/20 disabled:opacity-50"
             :disabled="cartCount === 0"
-            @click="showCart = true">
+            @click="openCart()">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
       Cart <span class="bg-white/20 px-2 py-0.5 rounded-lg text-[10px]" x-show="cartCount > 0" x-text="cartCount"></span>
     </button>
@@ -125,7 +125,7 @@
        x-transition:leave-start="opacity-100"
        x-transition:leave-end="opacity-0"
        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-end justify-center sm:items-center sm:p-4" 
-       @click.self="activeItem = null" x-cloak>
+       @click.self="closeCustomization()" x-cloak>
     
     <div @click.stop 
          x-show="activeItem"
@@ -208,7 +208,7 @@
           </div>
 
           <button class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all mt-4" 
-                  @click="addToCart()">
+                  @click="addToCartAndClose()">
             Add to cart
           </button>
         </div>
@@ -225,7 +225,7 @@
        x-transition:leave-start="opacity-100"
        x-transition:leave-end="opacity-0"
        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-end justify-center sm:items-center sm:p-4" 
-       @click.self="showCart = false" x-cloak>
+       @click.self="closeCart()" x-cloak>
     
     <div @click.stop 
          x-show="showCart"
@@ -417,16 +417,64 @@
           try {
             this.cart = JSON.parse(sessionStorage.getItem('df_cart') || '[]');
           } catch(e) { this.cart = []; }
+
+          // Back-button closes overlays instead of navigating away
+          window.addEventListener('popstate', (e) => {
+            if (this.showCart) {
+              this.showCart = false;
+              return;
+            }
+            if (this.activeItem) {
+              this.activeItem = null;
+              return;
+            }
+          });
+
+          // Clean up stale history on fresh page load (e.g. after checkout redirect)
+          if (history.state && history.state.dfOverlay) {
+            history.replaceState(null, '');
+          }
         },
         saveCart() {
           sessionStorage.setItem('df_cart', JSON.stringify(this.cart));
         },
 
-        openItem(id) {
+        // ── Overlay history management ──
+        openCart() {
+          this.showCart = true;
+          history.pushState({ dfOverlay: 'cart' }, '');
+        },
+        closeCart() {
+          if (this.placing) return; // Don't close during payment
+          this.showCart = false;
+          // Pop the history entry we pushed (if it's ours)
+          if (history.state && history.state.dfOverlay === 'cart') {
+            history.back();
+          }
+        },
+        openCustomization(id) {
           const item = MENU_DATA[id];
           if (!item) return;
           this.activeItem = item;
           this.selection = { dining: 'DINE_IN', spice: 'MILD', qty: 1, addons: {} };
+          history.pushState({ dfOverlay: 'customize' }, '');
+        },
+        closeCustomization() {
+          this.activeItem = null;
+          if (history.state && history.state.dfOverlay === 'customize') {
+            history.back();
+          }
+        },
+        addToCartAndClose() {
+          this.addToCart();
+          // Pop the customization history entry
+          if (history.state && history.state.dfOverlay === 'customize') {
+            history.back();
+          }
+        },
+
+        openItem(id) {
+          this.openCustomization(id);
         },
 
         incAddon(addon) {
@@ -530,6 +578,8 @@
             const data = await res.json();
             if (data.status === 'ok') {
               sessionStorage.removeItem('df_cart');
+              // Clean history so back button doesn't return to stale cart
+              history.replaceState(null, '');
               window.location.href = data.redirect;
             } else if (data.status === 'razorpay_pending') {
               const options = {
@@ -545,6 +595,7 @@
                 theme: { color: '#1a3c5e' },
                 handler: async (response) => {
                   sessionStorage.removeItem('df_cart');
+                  history.replaceState(null, '');
                   try {
                     await fetch(RAZORPAY_VERIFY_URL, {
                       method: 'POST',
