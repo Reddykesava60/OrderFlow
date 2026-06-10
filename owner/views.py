@@ -844,6 +844,8 @@ class StaffDeleteView(OwnerRequiredMixin, View):
             },
         )
         user.delete()
+        from kitchen.services import broadcast_user_disconnect
+        broadcast_user_disconnect(user_id)
         messages.success(request, f"'{username}' removed.")
         return redirect('owner:staff')
 
@@ -912,6 +914,9 @@ class StaffEditView(OwnerRequiredMixin, View):
             },
         )
 
+        from kitchen.services import broadcast_user_disconnect
+        broadcast_user_disconnect(user.id)
+
         messages.success(request, f"'{user.username}' updated.")
         return redirect('owner:staff')
 
@@ -933,6 +938,8 @@ class StaffResetPasswordView(OwnerRequiredMixin, View):
         )
 
         request.session[f'temp_pw_{user.id}'] = temp_password
+        from kitchen.services import broadcast_user_disconnect
+        broadcast_user_disconnect(user.id)
         messages.success(request, f"Password reset for '{user.username}'.")
         return redirect('owner:staff_created', user_id=user.id)
 
@@ -969,6 +976,9 @@ class StaffPermissionToggleView(OwnerRequiredMixin, View):
                 'after': getattr(user, permission),
             },
         )
+        
+        from kitchen.services import broadcast_user_disconnect
+        broadcast_user_disconnect(user.id)
         
         return JsonResponse({
             'status': 'success',

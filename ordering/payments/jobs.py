@@ -49,26 +49,40 @@ def reconcile_payment_task(self, payment_transaction_id):
         raise self.retry(exc=exc)
 
 
-@shared_task
-def expire_pending_payments_task():
-    expired = 0
-    qs = PaymentTransaction.objects.filter(
-        state__in=[PaymentState.PENDING, PaymentState.INITIATED, PaymentState.PROCESSING],
-        expires_at__lt=timezone.now(),
-    ).select_related("order")
-    for payment in qs:
-        try:
-            # Inline execution for the cron task to avoid spawning too many async jobs
-            PaymentReconciliationService().reconcile_payment(payment)
-            payment.refresh_from_db()
-            if payment.state in [PaymentState.PENDING, PaymentState.INITIATED, PaymentState.PROCESSING]:
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def expire_single_payment_task(self, payment_transaction_id):
+    try:
+        payment = PaymentTransaction.objects.get(pk=payment_transaction_id)
+        # Attempt to reconcile first in case the webhook was delayed
+        PaymentReconciliationService().reconcile_payment(payment)
+        payment.refresh_from_db()
+        if payment.state in [PaymentState.PENDING, PaymentState.INITIATED, PaymentState.PROCESSING]:
+            if payment.expires_at and payment.expires_at < timezone.now():
                 payment.transition_to(PaymentState.EXPIRED)
                 payment.version += 1
                 payment.save(update_fields=["state", "version", "updated_at"])
-                expired += 1
-        except Exception:
-            logger.exception("expire_pending_payment_failed payment=%s", payment.id)
-    return expired
+                return True
+        return False
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@shared_task
+def expire_pending_payments_task():
+    qs = PaymentTransaction.objects.filter(
+        state__in=[PaymentState.PENDING, PaymentState.INITIATED, PaymentState.PROCESSING],
+        expires_at__lt=timezone.now(),
+    ).values_list('id', flat=True)
+    
+    dispatched = 0
+    for payment_id in qs:
+        if settings.PAYMENT_JOBS_INLINE:
+            expire_single_payment_task(payment_id)
+        else:
+            expire_single_payment_task.delay(payment_id)
+        dispatched += 1
+        
+    return dispatched
 
 
 @shared_task

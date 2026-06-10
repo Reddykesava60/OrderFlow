@@ -18,13 +18,19 @@ class EventBus:
         self._handlers[event_type].append(handler)
 
     def publish(self, event: DomainEvent):
+        from django.db import transaction
         event_type = type(event)
         handlers = self._handlers.get(event_type, [])
         for handler in handlers:
-            try:
-                handler(event)
-            except Exception as e:
-                logger.exception("Error handling event %s with handler %s: %s", event_type, handler, e)
+            def _execute_handler(h=handler, e=event):
+                try:
+                    h(e)
+                except Exception as exc:
+                    logger.exception("Error handling event %s with handler %s: %s", event_type, h, exc)
+            
+            # Ensure side-effects only run if the current DB transaction commits successfully.
+            # If called outside a transaction block, this executes immediately.
+            transaction.on_commit(_execute_handler)
 
 # Global singleton event bus
 event_bus = EventBus()

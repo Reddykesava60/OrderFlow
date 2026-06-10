@@ -45,6 +45,9 @@ if not ALLOWED_HOSTS:
 if SECRET_KEY.startswith('django-insecure-') or len(set(SECRET_KEY)) < 20 or len(SECRET_KEY) < 50:
     raise ImproperlyConfigured('Production SECRET_KEY must be strong and must not be committed.')
 
+# Optimize DB connections for production load
+DATABASES['default']['CONN_MAX_AGE'] = 60
+
 REDIS_URL = config('REDIS_URL', default='')
 
 if REDIS_URL:

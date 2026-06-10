@@ -400,6 +400,7 @@ class PaymentMutationService:
                         order=order, is_confirmed=False,
                     )
                 )
+                from ordering.services import _restore_item_availability_after_stock_return
                 for res in reservations:
                     if res.menu_item_id and res.menu_item and res.menu_item.stock is not None:
                         from django.db import models as db_models
@@ -407,6 +408,7 @@ class PaymentMutationService:
                         MenuItem.objects.filter(pk=res.menu_item_id).update(
                             stock=db_models.F('stock') + res.quantity
                         )
+                        _restore_item_availability_after_stock_return(res.menu_item_id)
                     if res.addon_id and res.addon and res.addon.stock is not None:
                         from core.models import AddOn
                         from django.db import models as db_models

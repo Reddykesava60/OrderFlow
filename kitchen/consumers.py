@@ -18,9 +18,14 @@ class KDSWebsocketConsumer(AsyncWebsocketConsumer):
         # Join restaurant-specific KDS group
         self.restaurant_id = str(user.restaurant_id)
         self.group_name = f"kds_{self.restaurant_id}"
+        self.user_group_name = f"user_{user.id}"
         
         await self.channel_layer.group_add(
             self.group_name,
+            self.channel_name
+        )
+        await self.channel_layer.group_add(
+            self.user_group_name,
             self.channel_name
         )
         
@@ -32,6 +37,19 @@ class KDSWebsocketConsumer(AsyncWebsocketConsumer):
                 self.group_name,
                 self.channel_name
             )
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
+                self.channel_name
+            )
+
+    async def force_disconnect(self, event):
+        """Handle broadcast instruction to forcefully disconnect this session."""
+        await self.send(text_data=json.dumps({
+            'action': 'force_disconnect',
+            'message': 'Your session has been terminated by the server.'
+        }))
+        await self.close()
 
     async def receive(self, text_data):
         try:
