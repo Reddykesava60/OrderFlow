@@ -37,6 +37,15 @@
               900: '#0a233d',
             },
             accent: '#e85d20',
+          },
+          animation: {
+            'blink-fast': 'blink-fast 1s ease-in-out infinite',
+          },
+          keyframes: {
+            'blink-fast': {
+              '0%, 100%': { opacity: 1 },
+              '50%': { opacity: 0.3 },
+            }
           }
         }
       }
@@ -307,9 +316,9 @@
           <!-- Payment Waiting Message -->
           <div x-show="placing" x-cloak
                x-transition.opacity.duration.300ms
-               class="p-4 rounded-2xl border border-brand-200 bg-brand-50 text-brand-800 flex flex-col items-center justify-center text-center gap-3 animate-pulse shadow-[0_0_15px_rgba(12,145,235,0.2)]">
-            <svg class="w-6 h-6 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <span class="text-xs font-black tracking-wide leading-relaxed">Payment is being verified.<br/>Please do not close or refresh this page until your receipt appears.</span>
+               class="p-4 rounded-2xl border-2 border-amber-400 bg-amber-50 text-amber-900 flex flex-col items-center justify-center text-center gap-3 animate-blink-fast shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+            <svg class="w-8 h-8 animate-spin text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <span class="text-sm font-black tracking-wide leading-relaxed uppercase">Payment is being verified.<br/>Please do not close or refresh this page!</span>
           </div>
 
           <button class="w-full bg-accent text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
