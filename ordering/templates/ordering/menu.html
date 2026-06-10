@@ -37,15 +37,6 @@
               900: '#0a233d',
             },
             accent: '#e85d20',
-          },
-          animation: {
-            'blink-fast': 'blink-fast 1s ease-in-out infinite',
-          },
-          keyframes: {
-            'blink-fast': {
-              '0%, 100%': { opacity: 1 },
-              '50%': { opacity: 0.3 },
-            }
           }
         }
       }
@@ -313,12 +304,33 @@
             <span class="text-[10px] font-bold text-slate-400 leading-normal">I agree to my order details being used to prepare my food.</span>
           </label>
 
-          <!-- Payment Waiting Message -->
-          <div x-show="placing" x-cloak
-               x-transition.opacity.duration.300ms
-               class="p-4 rounded-2xl border-2 border-amber-400 bg-amber-50 text-amber-900 flex flex-col items-center justify-center text-center gap-3 animate-blink-fast shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-            <svg class="w-8 h-8 animate-spin text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <span class="text-sm font-black tracking-wide leading-relaxed uppercase">Payment is being verified.<br/>Please do not close or refresh this page!</span>
+          <!-- Payment Attention Warning -->
+          <div class="p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-3 relative overflow-hidden"
+               :class="placing ? 'bg-orange-100 border-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.4)] scale-[1.02]' : 'bg-orange-50 border-orange-200 shadow-sm'">
+            
+            <!-- Subtle background pulse effect in State 2 -->
+            <div x-show="placing" x-cloak class="absolute inset-0 bg-orange-400/10 animate-pulse pointer-events-none"></div>
+
+            <div class="flex items-start gap-3 relative z-10">
+              <!-- Icon -->
+              <div class="flex-shrink-0 mt-0.5 transition-transform duration-300" :class="placing ? 'scale-110' : ''">
+                <svg x-show="!placing" class="w-6 h-6 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <svg x-show="placing" x-cloak class="w-6 h-6 animate-spin text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              </div>
+
+              <!-- Text Content -->
+              <div class="flex-1">
+                <p class="text-xs font-black text-orange-900 tracking-wide leading-snug">
+                  Please wait after payment. Do not close or leave this page until your receipt appears.
+                </p>
+                <p class="text-[10px] font-bold uppercase tracking-widest mt-1.5 transition-colors duration-300" :class="placing ? 'text-orange-800 animate-pulse' : 'text-orange-700/70'">
+                  <span x-show="!placing">Payment verification may take a few seconds.</span>
+                  <span x-show="placing" x-cloak>Verifying Payment...</span>
+                </p>
+              </div>
+            </div>
           </div>
 
           <button class="w-full bg-accent text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
