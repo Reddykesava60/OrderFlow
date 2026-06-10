@@ -554,7 +554,7 @@
 
         showToast(msg, type) {
           const id = ++this.toastCounter;
-          this.toasts.push({ id, msg, type: type || 'error' });
+          this.toasts = [...this.toasts, { id, msg, type: type || 'error' }];
           const delay = type === 'success' ? 2500 : 4000;
           setTimeout(() => { this.dismissToast(id); }, delay);
         },
@@ -564,8 +564,10 @@
         },
 
         setSuccess(key) {
-          this.successStates[key] = true;
-          setTimeout(() => { this.successStates[key] = false; }, 2500);
+          this.successStates = { ...this.successStates, [key]: true };
+          setTimeout(() => { 
+            this.successStates = { ...this.successStates, [key]: false }; 
+          }, 2500);
         },
 
         isLoading(actionKey) {
@@ -574,14 +576,11 @@
 
         async withLoading(actionKey, fn) {
           if (this.pendingActions[actionKey]) return;
-          this.pendingActions[actionKey] = true;
+          this.pendingActions = { ...this.pendingActions, [actionKey]: true };
           try {
             await fn();
-            // On success, we generally rely on poll() to rebuild the DOM.
-            // Keeping it true prevents ghost clicks before the DOM removes the element.
-          } catch (e) {
-            this.pendingActions[actionKey] = false;
-            throw e;
+          } finally {
+            this.pendingActions = { ...this.pendingActions, [actionKey]: false };
           }
         },
 
