@@ -96,10 +96,73 @@
 </header>
 
 <main class="flex-1 w-full max-w-5xl mx-auto px-4 py-6 md:py-8 mb-20 md:mb-0">
-
-
   {% block content %}{% endblock %}
 </main>
+
+<!-- Floating Toast Notifications (Owner Panel) -->
+<div x-data="toastManager()" x-init="init()"
+     class="fixed z-[200] pointer-events-none
+            bottom-20 left-4 right-4
+            md:bottom-auto md:left-auto md:top-4 md:right-4 md:w-96
+            flex flex-col gap-2 items-center md:items-end safe-bottom">
+  <template x-for="toast in toasts" :key="toast.id">
+    <div x-show="toast.visible"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
+         class="pointer-events-auto w-full max-w-sm flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold shadow-lg border backdrop-blur-sm"
+         :class="toast.type === 'success'
+           ? 'bg-white/95 border-emerald-200 text-emerald-800'
+           : toast.type === 'error'
+             ? 'bg-white/95 border-rose-200 text-rose-800'
+             : 'bg-white/95 border-blue-200 text-blue-800'">
+      <span class="flex-shrink-0 text-base"
+            x-text="toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠' : 'ℹ'"></span>
+      <span class="flex-1 leading-snug" x-text="toast.msg"></span>
+    </div>
+  </template>
+</div>
+
+<script>
+  // Serialize Django messages into JS for the toast manager
+  const DJANGO_MESSAGES = [
+    {% if messages %}
+      {% for m in messages %}
+        { msg: '{{ m|escapejs }}', type: '{{ m.tags }}' },
+      {% endfor %}
+    {% endif %}
+  ];
+
+  function toastManager() {
+    return {
+      toasts: [],
+      counter: 0,
+      init() {
+        // Convert Django messages into floating toasts on page load
+        DJANGO_MESSAGES.forEach((m, i) => {
+          setTimeout(() => this.show(m.msg, m.type), i * 150);
+        });
+      },
+      show(msg, type) {
+        type = type || 'info';
+        const id = ++this.counter;
+        this.toasts.push({ id, msg, type, visible: true });
+        if (this.toasts.length > 5) this.toasts.shift();
+        const duration = type === 'error' ? 5000 : 3000;
+        setTimeout(() => {
+          const t = this.toasts.find(x => x.id === id);
+          if (t) t.visible = false;
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(x => x.id !== id);
+          }, 300);
+        }, duration);
+      }
+    };
+  }
+</script>
 
 <!-- Bottom Navigation (Mobile Only) -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-2 py-1 z-50 safe-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.05)] overflow-x-auto">
@@ -133,66 +196,7 @@
   </div>
 </nav>
 
-<!-- Floating Toast Notification System -->
-<div x-data="ownerToasts()" x-show="toasts.length > 0" class="fixed bottom-24 left-4 right-4 z-50 flex flex-col items-center md:items-end gap-2 md:bottom-auto md:left-auto md:right-4 md:top-4 md:w-80 pointer-events-none">
-  <template x-for="toast in toasts" :key="toast.id">
-    <div x-show="true"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-4 md:-translate-y-4 md:translate-x-4 scale-95"
-         x-transition:enter-end="opacity-100 translate-y-0 md:translate-x-0 scale-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-         x-transition:leave-end="opacity-0 translate-y-2 scale-95"
-         class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-xl border border-slate-100 pointer-events-auto"
-         :class="toast.type === 'success' ? 'border-l-4 border-l-emerald-500' : (toast.type === 'error' ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-brand-500')">
-      
-      <div class="flex-shrink-0">
-        <template x-if="toast.type === 'success'">
-          <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-        </template>
-        <template x-if="toast.type === 'error'">
-          <svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        </template>
-        <template x-if="toast.type !== 'success' && toast.type !== 'error'">
-          <svg class="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        </template>
-      </div>
-      
-      <p class="text-xs font-black text-slate-800 uppercase tracking-widest flex-1 leading-snug" x-text="toast.msg"></p>
-      
-      <button @click="dismissToast(toast.id)" class="ml-auto flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-      </button>
-    </div>
-  </template>
-</div>
-
 {% block scripts %}{% endblock %}
-
-<script>
-  function ownerToasts() {
-    return {
-      toasts: [],
-      toastCounter: 0,
-      init() {
-        {% if messages %}
-          {% for m in messages %}
-            this.showToast("{{ m|escapejs }}", "{{ m.tags }}");
-          {% endfor %}
-        {% endif %}
-      },
-      showToast(msg, type) {
-        const id = ++this.toastCounter;
-        this.toasts.push({ id, msg, type: type || 'info' });
-        const delay = type === 'success' ? 2500 : (type === 'error' ? 4000 : 3000);
-        setTimeout(() => { this.dismissToast(id); }, delay);
-      },
-      dismissToast(id) {
-        this.toasts = this.toasts.filter(t => t.id !== id);
-      }
-    }
-  }
-</script>
 
 <script>
   // Global Navigation Transition & Click Debounce
