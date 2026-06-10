@@ -597,7 +597,7 @@
                   sessionStorage.removeItem('df_cart');
                   history.replaceState(null, '');
                   try {
-                    await fetch(RAZORPAY_VERIFY_URL, {
+                    const verifyRes = await fetch(RAZORPAY_VERIFY_URL, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -609,7 +609,15 @@
                         razorpay_signature: response.razorpay_signature,
                       }),
                     });
-                  } catch (e) { }
+                    if (!verifyRes.ok) {
+                      console.warn('[DineFlow] Payment verify response:', verifyRes.status, await verifyRes.text().catch(() => ''));
+                    }
+                  } catch (e) {
+                    // Log the error for debugging — the receipt page will show
+                    // payment status regardless, and the webhook/reconciliation
+                    // cron will confirm the payment asynchronously.
+                    console.error('[DineFlow] Payment verification failed:', e);
+                  }
                   window.location.href = data.receipt_url + '?upi=1';
                 }
               };

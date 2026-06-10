@@ -385,11 +385,16 @@ class ReceiptView(View):
 class RazorpayVerifyView(View):
     """
     POST /payments/razorpay/verify/
-    Verifies the checkout signature returned to the browser and confirms
-    the order immediately. Webhook processing remains the async fallback.
 
-    This endpoint ensures a PaymentTransaction record is created/found
-    so that every confirmed UPI payment has full transactional tracking.
+    Fast-path operational confirmation for Razorpay payments.
+
+    Verification flow:
+      1. Verify checkout signature (proves checkout flow completed)
+      2. Backend payment.fetch() (proves payment is actually captured)
+      3. mark_paid() (confirm order, create ledger entries)
+
+    Webhooks serve as the authoritative async reconciliation safety net.
+    This endpoint provides low-latency confirmation for kitchen/KDS responsiveness.
     """
 
     def post(self, request):
@@ -408,6 +413,11 @@ class RazorpayVerifyView(View):
         if not rz_order_id or not rz_payment_id or not rz_signature:
             return JsonResponse({'error': 'MISSING_FIELDS'}, status=400)
 
+        logger.info(
+            "payment_verify_received rz_order_id=%s rz_payment_id=%s",
+            rz_order_id, rz_payment_id,
+        )
+
         try:
             order = (
                 Order.objects
@@ -415,11 +425,17 @@ class RazorpayVerifyView(View):
                 .get(razorpay_order_id=rz_order_id)
             )
         except Order.DoesNotExist:
-            logger.warning("Razorpay verify: no order found for %s", rz_order_id)
+            logger.warning(
+                "payment_verify_order_not_found rz_order_id=%s", rz_order_id,
+            )
             return JsonResponse({'error': 'ORDER_NOT_FOUND'}, status=404)
 
         # Already confirmed — return immediately (idempotent)
         if order.status != Order.Status.UNPAID:
+            logger.info(
+                "payment_verify_already_confirmed rz_order_id=%s order_status=%s",
+                rz_order_id, order.status,
+            )
             return JsonResponse({
                 'ok': True,
                 'order_id': str(order.id),
@@ -434,13 +450,19 @@ class RazorpayVerifyView(View):
                 require_active=False,
             )
         except PaymentConfigurationError as e:
-            logger.warning("Razorpay verify: payment config unavailable for %s", rz_order_id)
+            logger.warning(
+                "payment_verify_config_unavailable rz_order_id=%s error=%s",
+                rz_order_id, e,
+            )
             return JsonResponse({'error': 'PAYMENT_CONFIG_ERROR', 'message': str(e)}, status=503)
 
         client = razorpay.Client(
             auth=(payment_config.razorpay_key_id, payment_config.get_razorpay_key_secret())
         )
 
+        # ── Step 1: Verify checkout signature ──
+        # This proves the checkout flow completed (HMAC of order_id + payment_id
+        # using key_secret). Necessary but not sufficient for financial truth.
         try:
             client.utility.verify_payment_signature({
                 'razorpay_order_id': rz_order_id,
@@ -448,9 +470,85 @@ class RazorpayVerifyView(View):
                 'razorpay_signature': rz_signature,
             })
         except razorpay.errors.SignatureVerificationError:
-            logger.warning("Razorpay verify: invalid checkout signature for %s", rz_order_id)
+            logger.warning(
+                "payment_verify_signature_invalid rz_order_id=%s rz_payment_id=%s",
+                rz_order_id, rz_payment_id,
+            )
             return JsonResponse({'error': 'INVALID_SIGNATURE'}, status=400)
 
+        logger.info(
+            "payment_verify_signature_valid rz_order_id=%s rz_payment_id=%s",
+            rz_order_id, rz_payment_id,
+        )
+
+        # ── Step 2: Backend payment.fetch() — verify actual capture status ──
+        # This is the critical hardening step. The checkout signature only proves
+        # the checkout flow completed, not that money was actually captured.
+        # We fetch the payment directly from Razorpay to confirm capture.
+        rz_payment_status = None
+        rz_payment_amount = None
+        try:
+            rz_payment = client.payment.fetch(rz_payment_id)
+            rz_payment_status = rz_payment.get('status')
+            rz_payment_amount = rz_payment.get('amount')  # in paise
+
+            logger.info(
+                "payment_verify_fetch_result rz_order_id=%s rz_payment_id=%s "
+                "rz_status=%s rz_amount=%s",
+                rz_order_id, rz_payment_id, rz_payment_status, rz_payment_amount,
+            )
+
+            if rz_payment_status not in ('captured', 'authorized'):
+                # Payment was not captured — do NOT confirm the order.
+                # The webhook or reconciliation cron will handle it.
+                logger.warning(
+                    "payment_verify_not_captured rz_order_id=%s rz_payment_id=%s "
+                    "rz_status=%s — deferring to webhook",
+                    rz_order_id, rz_payment_id, rz_payment_status,
+                )
+                return JsonResponse({
+                    'ok': False,
+                    'error': 'PAYMENT_NOT_CAPTURED',
+                    'message': 'Payment is being processed. It will be confirmed shortly.',
+                    'rz_status': rz_payment_status,
+                }, status=202)
+
+            # Verify amount matches (paise vs rupees)
+            expected_paise = int(order.total * 100)
+            if rz_payment_amount is not None and int(rz_payment_amount) != expected_paise:
+                logger.error(
+                    "payment_verify_amount_mismatch rz_order_id=%s "
+                    "expected=%s actual=%s",
+                    rz_order_id, expected_paise, rz_payment_amount,
+                )
+                return JsonResponse({
+                    'error': 'AMOUNT_MISMATCH',
+                    'message': 'Payment amount does not match order total.',
+                }, status=400)
+
+        except razorpay.errors.BadRequestError:
+            # Payment ID doesn't exist at Razorpay — reject
+            logger.error(
+                "payment_verify_fetch_bad_request rz_order_id=%s rz_payment_id=%s",
+                rz_order_id, rz_payment_id,
+            )
+            return JsonResponse({
+                'error': 'PAYMENT_NOT_FOUND',
+                'message': 'Payment could not be verified with Razorpay.',
+            }, status=400)
+        except Exception:
+            # Network/timeout error fetching from Razorpay.
+            # Graceful fallback: checkout signature was already verified, so we
+            # proceed with confirmation. The reconciliation cron provides the
+            # safety net for edge cases.
+            logger.warning(
+                "payment_verify_fetch_failed rz_order_id=%s rz_payment_id=%s "
+                "— proceeding with checkout signature verification only",
+                rz_order_id, rz_payment_id,
+                exc_info=True,
+            )
+
+        # ── Step 3: Confirm the payment ──
         # Find or create a PaymentTransaction for this order so that
         # mark_paid() has a transaction to update. The webhook may also
         # create one, but get_or_create is idempotent.
@@ -473,13 +571,26 @@ class RazorpayVerifyView(View):
                 provider_order_id=rz_order_id,
                 provider_payment_id=rz_payment_id,
                 amount=order.total,
-                raw={'source': 'verify_endpoint'},
+                raw={
+                    'source': 'frontend_verify',
+                    'rz_payment_status': rz_payment_status,
+                    'rz_payment_amount': rz_payment_amount,
+                },
             )
             PaymentMutationService().mark_paid(payment, event)
             order.refresh_from_db()
 
+            logger.info(
+                "payment_verify_confirmed rz_order_id=%s rz_payment_id=%s "
+                "payment_id=%s source=frontend_verify",
+                rz_order_id, rz_payment_id, payment.id,
+            )
+
         except Exception:
-            logger.exception("Razorpay verify: mark_paid failed for %s", rz_order_id)
+            logger.exception(
+                "payment_verify_mark_paid_failed rz_order_id=%s rz_payment_id=%s",
+                rz_order_id, rz_payment_id,
+            )
             return JsonResponse({
                 'error': 'PAYMENT_PROCESSING_ERROR',
                 'message': 'Payment received but processing failed. It will be confirmed shortly via webhook.',
@@ -490,6 +601,7 @@ class RazorpayVerifyView(View):
             'order_id': str(order.id),
             'order_status': order.status,
         })
+
 
 
 @method_decorator(rate_limit('razorpay_webhook', limit=300, window=60), name='dispatch')

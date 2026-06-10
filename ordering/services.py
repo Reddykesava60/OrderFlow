@@ -995,7 +995,18 @@ def confirm_upi_payment(order, razorpay_payment_id):
     Called by the Razorpay webhook on payment.captured.
     Confirms StockReservations, marks order PENDING, creates PlatformFeeRecord,
     and records canonical RestaurantLedger entries — all atomic.
+
+    DEPRECATED: This is a legacy confirmation path. The canonical payment
+    mutation path is PaymentMutationService.mark_paid() in
+    ordering.payments.services. This function is kept for backward
+    compatibility. If you see this deprecation warning in logs, the
+    calling code should be migrated.
     """
+    logger.warning(
+        "DEPRECATED confirm_upi_payment called for order=%s rz_payment_id=%s — "
+        "migrate caller to PaymentMutationService.mark_paid()",
+        order.id, razorpay_payment_id,
+    )
     with transaction.atomic():
         order = Order.objects.select_for_update().select_related('restaurant').get(pk=order.pk)
 

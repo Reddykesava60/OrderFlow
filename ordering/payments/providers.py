@@ -174,7 +174,15 @@ class RazorpayProvider(BaseProvider):
 
     def verify_webhook(self, raw_body, headers, config):
         signature = headers.get("X-Razorpay-Signature") or headers.get("x-razorpay-signature")
-        return bool(signature and config.webhook_secret and hmac.compare_digest(self._hmac_hex(raw_body, config.webhook_secret), signature))
+        if not config.webhook_secret:
+            logger.warning(
+                "razorpay_webhook_secret_empty — signature verification impossible"
+            )
+            return False
+        if not signature:
+            logger.warning("razorpay_webhook_signature_header_missing")
+            return False
+        return hmac.compare_digest(self._hmac_hex(raw_body, config.webhook_secret), signature)
 
     def parse_webhook(self, payload, headers):
         event_type = payload.get("event", "")

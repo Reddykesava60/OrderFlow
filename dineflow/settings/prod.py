@@ -168,6 +168,26 @@ CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Prevent memory leaks over time
 PAYMENT_JOBS_INLINE = not REDIS_URL  # Inline if no broker available
 
 
+# ── Razorpay Production Validation ────────────────────────────────────────────
+# If Razorpay payment keys are configured (payments enabled), the webhook secret
+# MUST also be present. Without it, webhook signature verification is impossible
+# and the system silently degrades to frontend-only payment confirmation.
+if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise ImproperlyConfigured(
+            'RAZORPAY_WEBHOOK_SECRET is required when Razorpay payments are enabled in production. '
+            'Configure the webhook secret in both the Razorpay dashboard and the '
+            'RAZORPAY_WEBHOOK_SECRET environment variable. Without it, webhook '
+            'signature verification is impossible and payment confirmation '
+            'relies solely on frontend callbacks.'
+        )
+    if RAZORPAY_KEY_ID.startswith('rzp_test_'):
+        raise ImproperlyConfigured(
+            'RAZORPAY_KEY_ID starts with "rzp_test_" which indicates sandbox credentials. '
+            'Production must use live Razorpay credentials (rzp_live_...).'
+        )
+
+
 CELERY_BEAT_SCHEDULE = {
     'release-expired-reservations-every-5-minutes': {
         'task': 'ordering.payments.jobs.release_expired_reservations_task',

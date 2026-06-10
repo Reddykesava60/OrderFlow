@@ -109,8 +109,18 @@ def _parse_webhook_timestamp(headers):
 def _is_webhook_timestamp_fresh(headers):
     parsed = _parse_webhook_timestamp(headers)
     if parsed is None:
+        # Missing timestamp is suspicious but allowed for backward compatibility
+        # with older Razorpay webhook configurations.
+        logger.warning(
+            "payment_webhook_missing_timestamp — allowing for backward compatibility"
+        )
         return True
     age = abs((timezone.now() - parsed).total_seconds())
+    if age > PAYMENT_WEBHOOK_REPLAY_WINDOW_SECONDS:
+        logger.warning(
+            "payment_webhook_stale_timestamp age_seconds=%.0f max_allowed=%d",
+            age, PAYMENT_WEBHOOK_REPLAY_WINDOW_SECONDS,
+        )
     return age <= PAYMENT_WEBHOOK_REPLAY_WINDOW_SECONDS
 
 
@@ -428,10 +438,25 @@ class WebhookIngestionService:
         payload = json.loads(raw_body.decode("utf-8") or "{}")
         gateway = get_gateway(provider)
         event = gateway.parse_webhook(payload, headers)
+
+        logger.info(
+            "payment_webhook_received provider=%s event_kind=%s "
+            "event_id=%s provider_order_id=%s",
+            provider, event.kind, event.provider_event_id,
+            event.provider_order_id,
+        )
+
         payment = self._resolve_payment(provider, event, payload)
         if not payment:
-            logger.warning("payment_webhook_unresolved provider=%s event_id=%s", provider, event.provider_event_id)
+            logger.warning(
+                "payment_webhook_unresolved provider=%s event_id=%s "
+                "provider_order_id=%s provider_payment_id=%s",
+                provider, event.provider_event_id,
+                event.provider_order_id, event.provider_payment_id,
+            )
             return None
+
+        # Duplicate detection by provider event ID
         if event.provider_event_id:
             existing_event = WebhookLog.objects.filter(
                 restaurant=payment.restaurant,
@@ -439,11 +464,40 @@ class WebhookIngestionService:
                 provider_event_id=event.provider_event_id,
             ).first()
             if existing_event:
+                logger.info(
+                    "payment_webhook_duplicate provider=%s event_id=%s "
+                    "payment_id=%s",
+                    provider, event.provider_event_id, payment.id,
+                )
                 return existing_event
+
+        # Replay protection
         if not _is_webhook_timestamp_fresh(headers):
+            logger.warning(
+                "payment_webhook_replay_rejected provider=%s event_id=%s "
+                "payment_id=%s",
+                provider, event.provider_event_id, payment.id,
+            )
             raise PaymentGatewayError("Webhook timestamp is outside the allowed replay window.")
+
+        # Signature verification
         resolved = resolve_payment_config_for_transaction(payment, require_webhook=True)
         signature_valid = gateway.verify_webhook(raw_body, headers, resolved)
+
+        if signature_valid:
+            logger.info(
+                "payment_webhook_signature_valid provider=%s event_id=%s "
+                "payment_id=%s",
+                provider, event.provider_event_id, payment.id,
+            )
+        else:
+            logger.warning(
+                "payment_webhook_signature_invalid provider=%s event_id=%s "
+                "payment_id=%s",
+                provider, event.provider_event_id, payment.id,
+            )
+
+        # Persist the webhook log (dedup by payload hash)
         payload_hash = hashlib.sha256(raw_body).hexdigest()
         webhook_log, _ = WebhookLog.objects.get_or_create(
             restaurant=payment.restaurant,
@@ -468,6 +522,12 @@ class WebhookIngestionService:
         # Quick idempotency check without locking
         webhook_log = WebhookLog.objects.select_related("payment_transaction").get(pk=webhook_log.pk)
         if webhook_log.processed_at:
+            logger.info(
+                "payment_webhook_already_processed provider=%s event_id=%s "
+                "webhook_log_id=%s",
+                webhook_log.provider, webhook_log.provider_event_id,
+                webhook_log.id,
+            )
             return webhook_log
         if not webhook_log.signature_valid:
             raise PaymentGatewayError("Webhook signature was not verified.")
@@ -483,9 +543,22 @@ class WebhookIngestionService:
             webhook_log.processed_at = timezone.now()
             webhook_log.failed_reason = ""
             webhook_log.save(update_fields=["processed_at", "failed_reason"])
+
+            logger.info(
+                "payment_webhook_processed provider=%s event_id=%s "
+                "event_kind=%s payment_id=%s source=webhook",
+                webhook_log.provider, webhook_log.provider_event_id,
+                event.kind, webhook_log.payment_transaction_id,
+            )
         except Exception as exc:
             webhook_log.failed_reason = str(exc)
             webhook_log.save(update_fields=["failed_reason"])
+            logger.error(
+                "payment_webhook_processing_failed provider=%s event_id=%s "
+                "payment_id=%s error=%s",
+                webhook_log.provider, webhook_log.provider_event_id,
+                webhook_log.payment_transaction_id, exc,
+            )
             raise
         return webhook_log
 
