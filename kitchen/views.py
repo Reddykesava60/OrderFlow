@@ -269,6 +269,8 @@ class KDSView(ActiveStaffMixin, View):
         return render(request, "kitchen/kds.html", {
             "user": request.user,
             "restaurant": self.get_restaurant(),
+        })
+
 def _incr_metric(key):
     try:
         cache.incr(key)
