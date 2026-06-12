@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDS Observability Dashboard | Platform Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">KDS Observability (Platform Admin)</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Cache Hit Ratio</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-green-600">{{ hit_ratio }}%</span>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Cache Miss Ratio</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-red-500">{{ miss_ratio }}%</span>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Stale Cache Served</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-indigo-600">{{ stale_served }}</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Last Rebuild Duration</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-blue-600">{{ rebuild_ms }}ms</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Rate Limit Exceeded (429s)</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-red-600">{{ rate_limit_hits }}</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Total Poll Requests</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-gray-800">{{ total_requests }}</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Active Restaurants (Live)</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-teal-600">{{ active_restaurants }}</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h3 class="text-gray-500 text-sm font-medium">Active Screens (Live)</h3>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <span class="text-4xl font-semibold text-teal-600">{{ active_screens }}</span>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="window.location.reload()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700">
+            Refresh Metrics
+        </button>
+    </div>
+</body>
+</html>

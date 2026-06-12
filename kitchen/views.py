@@ -269,40 +269,30 @@ class KDSView(ActiveStaffMixin, View):
         return render(request, "kitchen/kds.html", {
             "user": request.user,
             "restaurant": self.get_restaurant(),
-        })
+def _incr_metric(key):
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=None)
 
+def _track_active_screen(restaurant_id, screen_session_key):
+    redis_url = getattr(settings, "REDIS_URL", None)
+    if redis_url:
+        import redis, time
+        try:
+            client = redis.from_url(redis_url)
+            now = int(time.time())
+            client.zadd("kds_active_restaurants", {str(restaurant_id): now})
+            client.zadd(f"kds_screens_{restaurant_id}", {str(screen_session_key): now})
+        except Exception:
+            pass
 
-@method_decorator(rate_limit('kds_poll', limit=180, window=60), name='dispatch')
+@method_decorator(rate_limit('kds_poll', limit=600, window=60), name='dispatch')
 class KDSPollView(ActiveStaffMixin, View):
-    def get(self, request):
-        restaurant = self.get_restaurant()
-        user = request.user
-        today = timezone.localdate()
-        today_start, today_end = local_day_bounds(today)
-
-        # Rate-limit expiration sweep: max once per 30s per restaurant
-        expiry_key = f"cash_expiry_lock_{restaurant.id}"
-        if cache.add(expiry_key, 1, timeout=30):
-            expire_overdue_unpaid_cash_orders(restaurant=restaurant)
-
-        # Get cache version
-        version_key = f"kds_version_{restaurant.id}"
-        version = cache.get(version_key, 1)
-
-        # Build unique cache key based on permissions
-        cache_key = (
-            f"kds_payload_{restaurant.id}_v{version}_"
-            f"{user.is_owner}_"
-            f"{user.allow_cash_collection}_"
-            f"{user.allow_view_all_orders}_"
-            f"{user.allow_order_completion}"
-        )
-
-        # Try to get cached payload
-        cached_payload = cache.get(cache_key)
-        if cached_payload:
-            return JsonResponse(cached_payload)
-
+    def _build_restaurant_payload(self, restaurant, today_start, today_end):
+        import time
+        start_time = time.time()
+        
         item_prefetch = Prefetch(
             "items",
             queryset=(
@@ -332,69 +322,59 @@ class KDSPollView(ActiveStaffMixin, View):
         kitchen_data = []
         preparing_data = []
         for order in active_orders:
-            kitchen_payload = _serialize_order_for_status(
-                order,
-                WorkStatus.PENDING,
-            )
-            preparing_payload = _serialize_order_for_status(
-                order,
-                WorkStatus.PREPARING,
-            )
+            kitchen_payload = _serialize_order_for_status(order, WorkStatus.PENDING)
+            preparing_payload = _serialize_order_for_status(order, WorkStatus.PREPARING)
             if kitchen_payload:
                 kitchen_data.append(kitchen_payload)
             if preparing_payload:
                 preparing_data.append(preparing_payload)
 
-        payment_orders = []
-        if user.allow_cash_collection or user.is_owner:
-            payment_orders = [
-                {
-                    "id": str(order.id),
-                    "order_number": order.order_number,
-                    "customer": _first_name(order.customer_name),
-                    "table": order.table_number,
-                    "status": order.status,
-                    "total": str(order.total),
-                    "created_at": order.created_at.isoformat(),
-                    "items": [
-                        {
-                            "id": str(item.id),
-                            "name": item.menu_item_name,
-                            "qty": item.quantity,
-                            "is_parcel": item.dining_option == item.DiningOption.PARCEL,
-                        }
-                        for item in order.items.all()
-                    ],
-                }
-                for order in (
-                    Order.objects
-                    .filter(
-                        restaurant=restaurant,
-                        created_at__gte=today_start,
-                        created_at__lt=today_end,
-                        status=Order.Status.UNPAID,
-                        payment_method=Order.PaymentMethod.CASH,
-                    )
-                    .prefetch_related(Prefetch("items", queryset=OrderItem.objects.all()))
-                    .order_by("created_at")
+        payment_orders = [
+            {
+                "id": str(order.id),
+                "order_number": order.order_number,
+                "customer": _first_name(order.customer_name),
+                "table": order.table_number,
+                "status": order.status,
+                "total": str(order.total),
+                "created_at": order.created_at.isoformat(),
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "name": item.menu_item_name,
+                        "qty": item.quantity,
+                        "is_parcel": item.dining_option == item.DiningOption.PARCEL,
+                    }
+                    for item in order.items.all()
+                ],
+            }
+            for order in (
+                Order.objects
+                .filter(
+                    restaurant=restaurant,
+                    created_at__gte=today_start,
+                    created_at__lt=today_end,
+                    status=Order.Status.UNPAID,
+                    payment_method=Order.PaymentMethod.CASH,
                 )
-            ]
+                .prefetch_related(Prefetch("items", queryset=OrderItem.objects.all()))
+                .order_by("created_at")
+            )
+        ]
 
-        all_orders = []
-        if user.allow_view_all_orders or user.is_owner:
-            all_orders = [
-                _serialize_all_order(order)
-                for order in (
-                    Order.objects
-                    .filter(
-                        restaurant=restaurant,
-                        created_at__gte=today_start,
-                        created_at__lt=today_end,
-                    )
-                    .prefetch_related(item_prefetch)
-                    .order_by("-created_at")
+        all_orders = [
+            _serialize_all_order(order)
+            for order in (
+                Order.objects
+                .filter(
+                    restaurant=restaurant,
+                    created_at__gte=today_start,
+                    created_at__lt=today_end,
                 )
-            ]
+                .prefetch_related(item_prefetch)
+                .order_by("-created_at")
+            )
+        ]
 
         filter_queryset = (
             StaffFilter.objects
@@ -428,16 +408,109 @@ class KDSPollView(ActiveStaffMixin, View):
                 "payments": len(payment_orders),
                 "all_orders": len(all_orders),
             },
-            "permissions": {
-                "can_complete": user.allow_order_completion or user.is_owner,
-                "can_collect": user.allow_cash_collection or user.is_owner,
-                "can_view_all": user.allow_view_all_orders or user.is_owner,
-                "can_bulk_update": _can_run_bulk_order_action(user),
-            },
+        }
+        
+        rebuild_ms = int((time.time() - start_time) * 1000)
+        logger.info("metric kds_payload_rebuild_ms %d restaurant_id=%s", rebuild_ms, restaurant.id)
+        cache.set("kds_metrics_payload_rebuild_ms", rebuild_ms, timeout=None)
+        return payload
+
+    def get(self, request):
+        import time
+        logger.info("metric kds_poll_requests_total 1 restaurant_id=%s", request.user.restaurant_id)
+        _incr_metric("kds_metrics_requests_total")
+        
+        restaurant = self.get_restaurant()
+        user = request.user
+        
+        # Track Active Screen / Restaurant
+        session_key = request.session.session_key or str(user.id)
+        _track_active_screen(restaurant.id, session_key)
+        today = timezone.localdate()
+        today_start, today_end = local_day_bounds(today)
+
+        # Rate-limit expiration sweep: max once per 30s per restaurant
+        expiry_key = f"cash_expiry_lock_{restaurant.id}"
+        if cache.add(expiry_key, 1, timeout=30):
+            expire_overdue_unpaid_cash_orders(restaurant=restaurant)
+
+        # Get cache version
+        version_key = f"kds_version_{restaurant.id}"
+        version_val = cache.get(version_key, 1)
+        # Ensure version is an int for stale math
+        try:
+            version = int(version_val)
+        except (ValueError, TypeError):
+            version = 1
+
+        # Build unique cache key normalized to restaurant and version
+        cache_key = f"kds_payload_{restaurant.id}_v{version}"
+        lock_key = f"{cache_key}_lock"
+
+        cached_payload = cache.get(cache_key)
+        
+        if cached_payload:
+            logger.info("metric kds_cache_hit 1 restaurant_id=%s", restaurant.id)
+            _incr_metric("kds_metrics_cache_hits")
+            master_payload = cached_payload
+        else:
+            logger.info("metric kds_cache_miss 1 restaurant_id=%s", restaurant.id)
+            _incr_metric("kds_metrics_cache_misses")
+            # Try to acquire lock
+            if cache.add(lock_key, "locked", timeout=5):
+                try:
+                    master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
+                    cache.set(cache_key, master_payload, timeout=300)
+                finally:
+                    cache.delete(lock_key)
+            else:
+                # Lock is held, we are in a thundering herd. Fall back to stale cache!
+                stale_version = version - 1
+                stale_key = f"kds_payload_{restaurant.id}_v{stale_version}"
+                stale_payload = cache.get(stale_key)
+                
+                if stale_payload:
+                    logger.info("metric kds_stale_served 1 restaurant_id=%s", restaurant.id)
+                    _incr_metric("kds_metrics_stale_served")
+                    master_payload = stale_payload
+                else:
+                    # Rare: Stale is gone. Enter short retry backoff up to 350ms total
+                    for delay in [0.05, 0.1, 0.2]:
+                        time.sleep(delay)
+                        cached_payload = cache.get(cache_key)
+                        if cached_payload:
+                            break
+                            
+                    if cached_payload:
+                        logger.info("metric kds_cache_hit 1 restaurant_id=%s", restaurant.id)
+                        _incr_metric("kds_metrics_cache_hits")
+                        master_payload = cached_payload
+                    else:
+                        # Desperation fallback
+                        master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
+                        cache.set(cache_key, master_payload, timeout=300)
+
+        # Apply User Permissions Filter
+        response_payload = master_payload.copy()
+        response_payload["tab_counts"] = master_payload.get("tab_counts", {}).copy()
+        
+        if not (user.allow_cash_collection or user.is_owner):
+            response_payload["payments"] = []
+            response_payload["tab_counts"]["payments"] = 0
+            
+        if not (user.allow_view_all_orders or user.is_owner):
+            response_payload["all_orders"] = []
+            response_payload["tab_counts"]["all_orders"] = 0
+
+        response_payload["permissions"] = {
+            "can_complete": user.allow_order_completion or user.is_owner,
+            "can_collect": user.allow_cash_collection or user.is_owner,
+            "can_view_all": user.allow_view_all_orders or user.is_owner,
+            "can_bulk_update": _can_run_bulk_order_action(user),
         }
 
         if getattr(settings, 'DEBUG', False) and request.GET.get("debug_permissions") == "1":
-            payload["debug_permissions"] = {
+            response_payload["debug_permissions"] = {
                 "username": user.username,
                 "is_owner": user.is_owner,
                 "allow_cash_collection": user.allow_cash_collection,
@@ -445,10 +518,13 @@ class KDSPollView(ActiveStaffMixin, View):
                 "allow_view_all_orders": user.allow_view_all_orders,
             }
 
-        # Cache payload for 5 minutes (invalidated proactively via trigger_kds_refresh)
-        cache.set(cache_key, payload, timeout=300)
-
-        return JsonResponse(payload)
+        response = JsonResponse(response_payload)
+        
+        # Optionally inject STALE header for debugging
+        if 'stale_payload' in locals() and stale_payload:
+            response["X-Cache"] = "STALE"
+            
+        return response
 
 
 class StartPrepView(OrderCompletionMixin, View):

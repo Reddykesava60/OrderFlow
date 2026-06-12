@@ -45,6 +45,13 @@ def rate_limit(name, *, limit, window, key_func=None):
                 return view_func(*args, **kwargs)
 
             if count > limit:
+                logger.info("metric kds_rate_limit_hits 1 endpoint=%s ip=%s", name, client_ip(request))
+                from django.core.cache import cache
+                try:
+                    cache.incr("kds_metrics_rate_limit_hits")
+                except ValueError:
+                    cache.set("kds_metrics_rate_limit_hits", 1, timeout=None)
+                
                 response = JsonResponse(
                     {
                         "error": "RATE_LIMITED",

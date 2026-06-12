@@ -493,7 +493,12 @@
         reconnectTimer: null,
 
         init() {
-          this.poll();
+          this.debouncedPoll = this.debounce(() => {
+            setTimeout(() => this.pollImpl(), Math.random() * 500);
+          }, 3000);
+          this.poll = () => this.debouncedPoll();
+          
+          this.pollImpl(); // Initial load
           this.nowTickTimer = setInterval(() => { this.nowMs = Date.now(); }, 1000);
           this.connectWebSocket();
           
@@ -525,8 +530,7 @@
           this.ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.action === 'refresh') {
-              // Add 0-500ms randomized jitter to prevent thundering herd
-              setTimeout(() => this.poll(), Math.random() * 500);
+              this.poll();
             }
           };
           
@@ -544,6 +548,16 @@
           this.ws.onerror = (err) => {
             console.error('KDS WebSocket error', err);
             this.ws.close();
+          };
+        },
+
+        debounce(func, wait) {
+          let timeout;
+          return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+              func.apply(this, args);
+            }, wait);
           };
         },
 
@@ -626,7 +640,7 @@
             .filter((order) => order.visible_items.length > 0);
         },
 
-        async poll() {
+        async pollImpl() {
           try {
             const res = await fetch("{% url 'kitchen:poll' %}", { credentials: 'same-origin' });
             if (!res.ok) throw new Error('Request failed');

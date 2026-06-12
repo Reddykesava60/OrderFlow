@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from core.views_admin import KDSMetricsDashboardView
 from . import views
 
 admin.site.site_header = f'{settings.APP_NAME} Platform'
@@ -16,6 +17,7 @@ urlpatterns = [
     path('healthz/live/', views.health_live, name='health_live'),
     path('healthz/ready/', views.health_ready, name='health_ready'),
 
+    path('admin/kds-metrics/', KDSMetricsDashboardView.as_view(), name='kds_metrics_dashboard'),
     path('admin/', admin.site.urls),
 
     # Customer-facing — public, no auth
