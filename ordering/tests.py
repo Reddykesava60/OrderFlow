@@ -2,6 +2,7 @@ from decimal import Decimal
 import hashlib
 import hmac
 import json
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -396,3 +397,156 @@ class TestRazorpayCredentialMode(TestCase):
     def test_test_credentials_rejected_in_production_mode(self):
         with self.assertRaises(PaymentConfigurationError):
             get_restaurant_payment_config(self.restaurant)
+
+
+class TestUpiPaymentRecovery(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name='Recovery Test', slug='recovery-test')
+        self.item = MenuItem.objects.create(
+            restaurant=self.restaurant,
+            name='Dosa',
+            base_price=Decimal('90.00'),
+            stock=10,
+        )
+        payment_config = self.restaurant.payment_config
+        payment_config.razorpay_key_id = 'rzp_test_example123456'
+        payment_config.razorpay_key_secret = 'test_secret_123'
+        payment_config.razorpay_webhook_secret = 'whsec_test_123'
+        payment_config.is_active = True
+        payment_config.save()
+
+    @patch('razorpay.Client')
+    @patch('requests.get')
+    def test_reconciliation_recovers_missing_webhook_and_frontend_verify(self, mock_get, mock_razorpay):
+        # Setup razorpay create mock
+        mock_client = mock_razorpay.return_value
+        mock_client.order.create.return_value = {'id': 'order_test_recovery_123'}
+
+        # 1 & 2 & 3: Place UPI order and create razorpay order (which now creates PaymentTransaction)
+        from ordering.services import create_razorpay_order
+        
+        order = place_upi_order(
+            self.restaurant,
+            cart_lines=[
+                {
+                    'item_id': str(self.item.id),
+                    'quantity': 1,
+                    'dining_option': 'DINE_IN',
+                    'addons': [],
+                }
+            ],
+            customer_name='Meena',
+            table_number='B2',
+        )
+        create_razorpay_order(order)
+        order.refresh_from_db()
+
+        self.assertEqual(order.status, Order.Status.UNPAID)
+        self.assertEqual(order.razorpay_order_id, 'order_test_recovery_123')
+
+        # Verify PaymentTransaction was eagerly created
+        pt = PaymentTransaction.objects.get(order=order)
+        self.assertEqual(pt.state, PaymentState.INITIATED)
+        self.assertEqual(pt.provider_order_id, 'order_test_recovery_123')
+
+        # 4 & 5 & 6: Simulate successful payment capture but skip verify/webhook
+        # Setup mock for reconciliation polling
+        class MockResponse:
+            def raise_for_status(self): pass
+            def json(self):
+                return {
+                    'items': [
+                        {'status': 'captured', 'id': 'pay_recovery_123', 'amount': 9000}
+                    ]
+                }
+        mock_get.return_value = MockResponse()
+
+        # 7: Run reconciliation task
+        from ordering.payments.jobs import reconcile_recent_payments_task
+        reconciled_count = reconcile_recent_payments_task(minutes=360, limit=200)
+        
+        # the task returns the number of reconciled payments
+        self.assertEqual(reconciled_count, 1)
+
+        # 8: Verify order becomes paid/pending
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(order.razorpay_payment_id, 'pay_recovery_123')
+
+        # Verify payment transaction state
+        pt.refresh_from_db()
+        self.assertEqual(pt.state, PaymentState.PAID)
+        self.assertEqual(pt.provider_payment_id, 'pay_recovery_123')
+
+        # Verify ledger entries
+        from ordering.models import RestaurantLedger
+        ledger_entry = RestaurantLedger.objects.filter(order=order, entry_type='CREDIT_ORDER').first()
+        self.assertIsNotNone(ledger_entry)
+        self.assertEqual(ledger_entry.amount, Decimal('90.00'))
+
+
+class TestPaymentJobsSerialization(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name='Job Test', slug='job-test')
+        self.order = Order.objects.create(
+            restaurant=self.restaurant,
+            order_number=1,
+            customer_name='Asha',
+            payment_method=Order.PaymentMethod.UPI,
+            status=Order.Status.UNPAID,
+            total=Decimal('50.00'),
+        )
+        self.payment = PaymentTransaction.objects.create(
+            restaurant=self.restaurant,
+            order=self.order,
+            provider='razorpay',
+            state=PaymentState.PENDING,
+            amount=Decimal('50.00'),
+            currency='INR',
+        )
+        self.webhook_log = WebhookLog.objects.create(
+            restaurant=self.restaurant,
+            payment_transaction=self.payment,
+            provider='razorpay',
+            payload_hash='hash123',
+            raw_payload='{}',
+        )
+
+    @patch('ordering.payments.jobs.WebhookIngestionService')
+    def test_process_payment_webhook_task_serialization(self, mock_service):
+        mock_service.return_value.process_log.return_value = self.webhook_log
+        
+        from ordering.payments.jobs import process_payment_webhook_task
+        result = process_payment_webhook_task(self.webhook_log.id)
+        # Verify JSON serializable
+        try:
+            json.dumps(result)
+        except TypeError as e:
+            self.fail(f"process_payment_webhook_task result is not JSON serializable: {e}")
+        self.assertEqual(result.get('webhook_log_id'), str(self.webhook_log.id))
+
+    @patch('ordering.payments.jobs.PaymentVerificationService')
+    def test_verify_payment_task_serialization(self, mock_service):
+        mock_service.return_value.verify_payment.return_value = self.payment
+        
+        from ordering.payments.jobs import verify_payment_task
+        result = verify_payment_task(self.payment.id)
+        # Verify JSON serializable
+        try:
+            json.dumps(result)
+        except TypeError as e:
+            self.fail(f"verify_payment_task result is not JSON serializable: {e}")
+        self.assertEqual(result.get('payment_transaction_id'), str(self.payment.id))
+
+    @patch('ordering.payments.jobs.PaymentReconciliationService')
+    def test_reconcile_payment_task_serialization(self, mock_service):
+        mock_service.return_value.reconcile_payment.return_value = self.payment
+        
+        from ordering.payments.jobs import reconcile_payment_task
+        result = reconcile_payment_task(self.payment.id)
+        # Verify JSON serializable
+        try:
+            json.dumps(result)
+        except TypeError as e:
+            self.fail(f"reconcile_payment_task result is not JSON serializable: {e}")
+        self.assertEqual(result.get('payment_transaction_id'), str(self.payment.id))

@@ -25,7 +25,11 @@ def _dispatch_or_run(task_func, *args, **kwargs):
 def process_payment_webhook_task(self, webhook_log_id):
     try:
         log = WebhookLog.objects.get(pk=webhook_log_id)
-        return WebhookIngestionService().process_log(log)
+        result = WebhookIngestionService().process_log(log)
+        return {
+            "webhook_log_id": str(result.id),
+            "status": "processed",
+        }
     except Exception as exc:
         logger.exception("Webhook processing failed, retrying...")
         raise self.retry(exc=exc)
@@ -35,7 +39,11 @@ def process_payment_webhook_task(self, webhook_log_id):
 def verify_payment_task(self, payment_transaction_id):
     try:
         payment = PaymentTransaction.objects.get(pk=payment_transaction_id)
-        return PaymentVerificationService().verify_payment(payment)
+        result = PaymentVerificationService().verify_payment(payment)
+        return {
+            "payment_transaction_id": str(result.id),
+            "state": result.state,
+        }
     except Exception as exc:
         raise self.retry(exc=exc)
 
@@ -44,7 +52,11 @@ def verify_payment_task(self, payment_transaction_id):
 def reconcile_payment_task(self, payment_transaction_id):
     try:
         payment = PaymentTransaction.objects.get(pk=payment_transaction_id)
-        return PaymentReconciliationService().reconcile_payment(payment)
+        result = PaymentReconciliationService().reconcile_payment(payment)
+        return {
+            "payment_transaction_id": str(result.id),
+            "state": result.state,
+        }
     except Exception as exc:
         raise self.retry(exc=exc)
 

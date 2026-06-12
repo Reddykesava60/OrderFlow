@@ -987,6 +987,22 @@ def create_razorpay_order(order):
     })
     order.razorpay_order_id = razorpay_order['id']
     order.save(update_fields=['razorpay_order_id'])
+
+    from ordering.models import PaymentTransaction, PaymentProvider, PaymentState
+    from django.utils import timezone
+    PaymentTransaction.objects.get_or_create(
+        restaurant=order.restaurant,
+        order=order,
+        provider=PaymentProvider.RAZORPAY,
+        provider_order_id=razorpay_order['id'],
+        defaults={
+            'state': PaymentState.INITIATED,
+            'amount': order.total,
+            'currency': 'INR',
+            'expires_at': timezone.now() + timezone.timedelta(minutes=15),
+        }
+    )
+
     return razorpay_order
 
 
