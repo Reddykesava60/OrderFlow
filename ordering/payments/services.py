@@ -27,6 +27,12 @@ from ordering.models import (
 from ordering.services import _create_fee_record
 
 from .contracts import PaymentCreateRequest, PaymentGatewayError, ProviderWebhookEvent
+
+class PaymentValidationError(PaymentGatewayError):
+    def __init__(self, message, meta_update):
+        super().__init__(message)
+        self.meta_update = meta_update
+
 from .providers import get_gateway
 from .resolver import resolve_payment_config, resolve_payment_config_for_transaction
 from .upi import build_app_intent_urls
@@ -293,23 +299,49 @@ class PaymentRetryService:
 
 
 class PaymentMutationService:
-    def apply_provider_event(self, payment, event):
-        if event.kind == "payment_paid":
-            return self.mark_paid(payment, event)
-        if event.kind == "payment_failed":
-            return self.mark_failed(payment, event)
+    def apply_provider_event(self, payment, event, metadata=None):
+        if metadata is None:
+            metadata = {}
+        try:
+            if event.kind == "payment_paid":
+                return self.mark_paid(payment, event, metadata)
+            if event.kind == "payment_failed":
+                return self.mark_failed(payment, event, metadata)
+        except PaymentValidationError as e:
+            meta = metadata.copy()
+            meta.update(e.meta_update)
+            PaymentEvent.objects.create(
+                event_type=PaymentEvent.EventType.PAYMENT_STATE_TRANSITION_FAILED,
+                event_status=PaymentEvent.EventStatus.FAILED,
+                transaction=payment,
+                order=payment.order,
+                order_ref=payment.order.order_ref_snapshot if payment.order else "",
+                restaurant=payment.restaurant,
+                amount=payment.amount,
+                razorpay_payment_id=event.provider_payment_id,
+                metadata=meta
+            )
+            raise
         return payment
 
-    def mark_paid(self, payment, event):
+    def mark_paid(self, payment, event, metadata=None):
+        if metadata is None:
+            metadata = {}
         with transaction.atomic():
             payment = PaymentTransaction.objects.select_for_update().select_related("order", "restaurant").get(pk=payment.pk)
             order = Order.objects.select_for_update().select_related("restaurant").get(pk=payment.order_id)
             if payment.state == PaymentState.PAID:
                 return payment
             if event.amount is not None and event.amount != payment.amount:
-                raise PaymentGatewayError(f"Payment amount mismatch for {payment.id}")
+                raise PaymentValidationError(f"Payment amount mismatch for {payment.id}", {
+                    "payment_amount": str(payment.amount),
+                    "event_amount": str(event.amount)
+                })
             if order.restaurant_id != payment.restaurant_id:
-                raise PaymentGatewayError("Payment tenant mismatch.")
+                raise PaymentValidationError("Payment tenant mismatch.", {
+                    "payment_restaurant_id": str(payment.restaurant_id),
+                    "order_restaurant_id": str(order.restaurant_id)
+                })
 
             StockReservation.objects.select_for_update().filter(order=order, is_confirmed=False).update(is_confirmed=True)
             now = timezone.now()
@@ -340,8 +372,11 @@ class PaymentMutationService:
                     order_ref=order.order_ref_snapshot,
                     restaurant=order.restaurant,
                     event_type=initiated_event_type,
+                    event_status=PaymentEvent.EventStatus.SUCCESS,
+                    transaction=payment,
                     amount=payment.amount,
                     razorpay_payment_id=payment.provider_payment_id,
+                    metadata=metadata
                 )
             if not PaymentEvent.objects.filter(order=order, event_type=event_type, razorpay_payment_id=payment.provider_payment_id).exists():
                 PaymentEvent.objects.create(
@@ -349,8 +384,11 @@ class PaymentMutationService:
                     order_ref=order.order_ref_snapshot,
                     restaurant=order.restaurant,
                     event_type=event_type,
+                    event_status=PaymentEvent.EventStatus.SUCCESS,
+                    transaction=payment,
                     amount=payment.amount,
                     razorpay_payment_id=payment.provider_payment_id,
+                    metadata=metadata
                 )
             if not PlatformFeeRecord.objects.filter(order=order).exists():
                 _create_fee_record(order, order.restaurant)
@@ -378,7 +416,9 @@ class PaymentMutationService:
         broadcast_payment_update(payment.restaurant_id, payment.id, payment.state, payment.order_id)
         return payment
 
-    def mark_failed(self, payment, event):
+    def mark_failed(self, payment, event, metadata=None):
+        if metadata is None:
+            metadata = {}
         with transaction.atomic():
             payment = PaymentTransaction.objects.select_for_update().select_related("order", "order__restaurant").get(pk=payment.pk)
             if payment.state in (PaymentState.PAID, PaymentState.REFUNDED):
@@ -426,7 +466,10 @@ class PaymentMutationService:
                     order_ref=order.order_ref_snapshot,
                     restaurant=order.restaurant,
                     event_type=PaymentEvent.EventType.PAYMENT_FAILED,
+                    event_status=PaymentEvent.EventStatus.SUCCESS,
+                    transaction=payment,
                     amount=order.total,
+                    metadata=metadata
                 )
 
         # Side effects AFTER transaction commits
@@ -450,6 +493,18 @@ class WebhookIngestionService:
 
         payment = self._resolve_payment(provider, event, payload)
         if not payment:
+            PaymentEvent.objects.create(
+                event_type=PaymentEvent.EventType.WEBHOOK_LOOKUP_FAILED,
+                event_status=PaymentEvent.EventStatus.FAILED,
+                amount=event.amount or Decimal('0.00'),
+                razorpay_payment_id=event.provider_payment_id,
+                metadata={
+                    "provider_order_id": event.provider_order_id,
+                    "provider_payment_id": event.provider_payment_id,
+                    "provider_event_id": event.provider_event_id,
+                    "payload": payload
+                }
+            )
             logger.warning(
                 "payment_webhook_unresolved provider=%s event_id=%s "
                 "provider_order_id=%s provider_payment_id=%s",
@@ -536,15 +591,59 @@ class WebhookIngestionService:
 
         payload = json.loads(webhook_log.raw_payload or "{}")
         event = get_gateway(webhook_log.provider).parse_webhook(payload, webhook_log.headers)
+        
+        payment = webhook_log.payment_transaction
+        order = payment.order if payment else None
+        
+        metadata = {
+            "webhook_log_id": str(webhook_log.id),
+            "provider_order_id": event.provider_order_id,
+            "provider_payment_id": event.provider_payment_id,
+            "provider_event_id": event.provider_event_id,
+            "transaction_id": str(payment.id) if payment else None,
+            "order_id": str(order.id) if order else None,
+        }
+
+        PaymentEvent.objects.create(
+            event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_STARTED,
+            event_status=PaymentEvent.EventStatus.INFO,
+            transaction=payment,
+            order=order,
+            order_ref=order.order_ref_snapshot if order else "",
+            restaurant=payment.restaurant if payment else None,
+            amount=payment.amount if payment else Decimal('0.00'),
+            razorpay_payment_id=event.provider_payment_id,
+            metadata=metadata
+        )
 
         try:
+            if not payment:
+                PaymentEvent.objects.create(
+                    event_type=PaymentEvent.EventType.PAYMENT_TRANSACTION_NOT_FOUND,
+                    event_status=PaymentEvent.EventStatus.FAILED,
+                    amount=event.amount or Decimal('0.00'),
+                    razorpay_payment_id=event.provider_payment_id,
+                    metadata=metadata
+                )
+                raise PaymentGatewayError("Payment transaction missing during log processing.")
+
             # apply_provider_event manages its own transaction.atomic() internally.
-            # We do NOT wrap this in another atomic block to avoid nested transaction
-            # side-effect bugs (WS broadcasts firing inside a transaction that later rolls back).
-            PaymentMutationService().apply_provider_event(webhook_log.payment_transaction, event)
+            PaymentMutationService().apply_provider_event(payment, event, metadata)
             webhook_log.processed_at = timezone.now()
             webhook_log.failed_reason = ""
             webhook_log.save(update_fields=["processed_at", "failed_reason"])
+            
+            PaymentEvent.objects.create(
+                event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_COMPLETED,
+                event_status=PaymentEvent.EventStatus.SUCCESS,
+                transaction=payment,
+                order=order,
+                order_ref=order.order_ref_snapshot if order else "",
+                restaurant=payment.restaurant,
+                amount=payment.amount,
+                razorpay_payment_id=event.provider_payment_id,
+                metadata=metadata
+            )
 
             logger.info(
                 "payment_webhook_processed provider=%s event_id=%s "
@@ -553,8 +652,28 @@ class WebhookIngestionService:
                 event.kind, webhook_log.payment_transaction_id,
             )
         except Exception as exc:
+            import traceback
             webhook_log.failed_reason = str(exc)
             webhook_log.save(update_fields=["failed_reason"])
+            
+            exc_meta = metadata.copy()
+            exc_meta["exception_type"] = type(exc).__name__
+            exc_meta["exception_message"] = str(exc)
+            exc_meta["traceback"] = traceback.format_exc()[:2000]
+            exc_meta["raw_payload"] = payload
+            
+            PaymentEvent.objects.create(
+                event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_EXCEPTION,
+                event_status=PaymentEvent.EventStatus.FAILED,
+                transaction=payment,
+                order=order,
+                order_ref=order.order_ref_snapshot if order else "",
+                restaurant=payment.restaurant if payment else None,
+                amount=payment.amount if payment else Decimal('0.00'),
+                razorpay_payment_id=event.provider_payment_id,
+                metadata=exc_meta
+            )
+            
             logger.error(
                 "payment_webhook_processing_failed provider=%s event_id=%s "
                 "payment_id=%s error=%s",

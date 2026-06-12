@@ -31,7 +31,7 @@ class WebhookIngressView(View):
             )
             if webhook_log:
                 try:
-                    ProcessPaymentWebhookJob.dispatch(webhook_log.id)
+                    ProcessPaymentWebhookJob.dispatch(str(webhook_log.id))
                 except Exception:
                     logger.exception(
                         "Webhook persisted but dispatch failed for %s/%s",

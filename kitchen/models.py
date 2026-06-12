@@ -21,6 +21,18 @@ class PaymentEvent(models.Model):
         REFUND_INITIATED           = 'REFUND_INITIATED',           'Refund Initiated'
         REFUND_PROCESSED           = 'REFUND_PROCESSED',           'Refund Processed'
         REFUND_FAILED              = 'REFUND_FAILED',              'Refund Failed'
+        WEBHOOK_LOOKUP_FAILED      = 'WEBHOOK_LOOKUP_FAILED',      'Webhook Lookup Failed'
+        WEBHOOK_PROCESSING_STARTED = 'WEBHOOK_PROCESSING_STARTED', 'Webhook Processing Started'
+        WEBHOOK_PROCESSING_COMPLETED = 'WEBHOOK_PROCESSING_COMPLETED', 'Webhook Processing Completed'
+        WEBHOOK_PROCESSING_EXCEPTION = 'WEBHOOK_PROCESSING_EXCEPTION', 'Webhook Processing Exception'
+        PAYMENT_TRANSACTION_NOT_FOUND = 'PAYMENT_TRANSACTION_NOT_FOUND', 'Payment Transaction Not Found'
+        PAYMENT_STATE_TRANSITION_FAILED = 'PAYMENT_STATE_TRANSITION_FAILED', 'Payment State Transition Failed'
+
+    class EventStatus(models.TextChoices):
+        INFO = 'INFO', 'Info'
+        SUCCESS = 'SUCCESS', 'Success'
+        WARNING = 'WARNING', 'Warning'
+        FAILED = 'FAILED', 'Failed'
 
     id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order               = models.ForeignKey(
@@ -32,11 +44,16 @@ class PaymentEvent(models.Model):
         Restaurant, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='payment_events'
     )
-    event_type          = models.CharField(max_length=30, choices=EventType.choices)
+    event_type          = models.CharField(max_length=40, choices=EventType.choices)
     amount              = models.DecimalField(max_digits=10, decimal_places=2)
     staff_user          = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True, blank=True)
     razorpay_payment_id = models.CharField(max_length=100, blank=True)
     razorpay_refund_id  = models.CharField(max_length=100, blank=True)
+    
+    transaction         = models.ForeignKey('ordering.PaymentTransaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_events')
+    event_status        = models.CharField(max_length=20, choices=EventStatus.choices, default=EventStatus.INFO)
+    metadata            = models.JSONField(default=dict, blank=True)
+    
     created_at          = models.DateTimeField(auto_now_add=True)
 
     class Meta:

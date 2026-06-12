@@ -6,14 +6,19 @@ from .models import PaymentEvent
 
 @admin.register(PaymentEvent)
 class PaymentEventAdmin(admin.ModelAdmin):
-    list_display  = ['created_at', 'restaurant', 'order_ref', 'event_type', 'amount_display', 'razorpay_payment_id']
-    list_filter   = ['event_type', 'restaurant']
-    search_fields = ['order_ref', 'razorpay_payment_id']
+    list_display  = ['created_at', 'restaurant', 'order_ref', 'event_type', 'event_status', 'amount_display', 'razorpay_payment_id']
+    list_filter   = ['event_status', 'event_type', 'restaurant']
+    search_fields = ['order_ref', 'razorpay_payment_id', 'transaction__id']
     date_hierarchy = 'created_at'
     ordering      = ['-created_at']
 
     def get_readonly_fields(self, request, obj=None):
-        return [f.name for f in self.model._meta.fields]  # append-only — no edits
+        return [f.name for f in self.model._meta.fields] + ['metadata_display']
+
+    @admin.display(description='Metadata')
+    def metadata_display(self, obj):
+        import json
+        return format_html('<pre>{}</pre>', json.dumps(obj.metadata, indent=2))
 
     @admin.display(description='Amount')
     def amount_display(self, obj):

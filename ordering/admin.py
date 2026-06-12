@@ -6,9 +6,34 @@ from .models import (
     RestaurantOrderCounter, PaymentTransaction, RestaurantBalance,
     Settlement, RestaurantLedger
 )
-
+from kitchen.models import PaymentEvent
 
 # ── Inlines ───────────────────────────────────────────────────────────────────
+
+class PaymentEventInline(admin.TabularInline):
+    model = PaymentEvent
+    extra = 0
+    readonly_fields = [
+        'created_at', 'event_type', 'event_status', 'amount_display', 
+        'razorpay_payment_id', 'metadata_display'
+    ]
+    fields = readonly_fields
+    can_delete = False
+    ordering = ['created_at']
+
+    @admin.display(description='Amount')
+    def amount_display(self, obj):
+        color = 'green' if obj.event_status == 'SUCCESS' else 'red' if obj.event_status == 'FAILED' else 'black'
+        return format_html('<span style="color:{};font-weight:bold">{}</span>', color, f"₹{obj.amount:,.2f}")
+
+    @admin.display(description='Metadata')
+    def metadata_display(self, obj):
+        import json
+        return format_html('<pre style="white-space: pre-wrap; font-size: 10px;">{}</pre>', json.dumps(obj.metadata, indent=2))
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+
 
 class OrderItemAddOnInline(admin.TabularInline):
     model = OrderItemAddOn
@@ -125,6 +150,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     readonly_fields = [f.name for f in PaymentTransaction._meta.fields]
+    inlines = [PaymentEventInline]
 
     @admin.display(description='ID')
     def id_short(self, obj):
