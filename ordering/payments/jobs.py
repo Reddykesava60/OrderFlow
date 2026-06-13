@@ -160,6 +160,44 @@ def retry_failed_payment_task(self, payment_transaction_id):
         raise self.retry(exc=exc)
 
 
+from datetime import timedelta
+import json
+
+@shared_task
+def stuck_webhook_detector_task():
+    cutoff = timezone.now() - timedelta(minutes=5)
+    stuck_webhooks = WebhookLog.objects.filter(
+        signature_valid=True,
+        processed_at__isnull=True,
+        created_at__lt=cutoff
+    )
+    
+    if stuck_webhooks.exists():
+        webhook_ids = []
+        provider_order_ids = []
+        for w in stuck_webhooks:
+            webhook_ids.append(str(w.id))
+            try:
+                payload = json.loads(w.raw_payload or "{}")
+                # Handle Razorpay nested structure
+                if w.provider == 'razorpay':
+                    order_id = payload.get('payload', {}).get('order', {}).get('entity', {}).get('id')
+                    if not order_id: # Also check payment payload
+                        order_id = payload.get('payload', {}).get('payment', {}).get('entity', {}).get('order_id', 'unknown')
+                    provider_order_ids.append(order_id)
+                else:
+                    provider_order_ids.append(w.provider_event_id)
+            except Exception:
+                provider_order_ids.append('parse_error')
+        
+        logger.error(
+            "stuck_webhooks_detected count=%s ids=%s provider_order_ids=%s",
+            stuck_webhooks.count(),
+            webhook_ids,
+            provider_order_ids
+        )
+    return stuck_webhooks.count()
+
 # Maintain old API compatibility for services importing jobs.py
 class ProcessPaymentWebhookJob:
     @classmethod

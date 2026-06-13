@@ -170,6 +170,20 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Optimize for fairness in long-running t
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Prevent memory leaks over time
 PAYMENT_JOBS_INLINE = not REDIS_URL  # Inline if no broker available
 
+# Hardening: Prevent dropped tasks on worker restarts
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
+# Routing: Dedicated queue for payment processing
+CELERY_TASK_QUEUES = {
+    "celery": {"exchange": "celery", "routing_key": "celery"},
+    "payments": {"exchange": "payments", "routing_key": "payments"},
+}
+
+CELERY_TASK_ROUTES = {
+    'ordering.payments.jobs.process_payment_webhook_task': {'queue': 'payments'},
+    'ordering.payments.jobs.process_unprocessed_webhooks_task': {'queue': 'payments'},
+}
 
 # ── Razorpay Production Validation ────────────────────────────────────────────
 # If Razorpay payment keys are configured (payments enabled), the webhook secret
@@ -203,6 +217,10 @@ CELERY_BEAT_SCHEDULE = {
     'process-unprocessed-webhooks-every-minute': {
         'task': 'ordering.payments.jobs.process_unprocessed_webhooks_task',
         'schedule': 60.0,
+    },
+    'detect-stuck-webhooks-every-5-minutes': {
+        'task': 'ordering.payments.jobs.stuck_webhook_detector_task',
+        'schedule': 300.0,
     },
     'reconcile-recent-payments-every-15-minutes': {
         'task': 'ordering.payments.jobs.reconcile_recent_payments_task',

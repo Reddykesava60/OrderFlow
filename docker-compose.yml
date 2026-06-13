@@ -51,7 +51,7 @@ services:
       - DJANGO_SETTINGS_MODULE=dineflow.settings.prod
       - REDIS_URL=${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379/0}
       - PAYMENT_JOBS_INLINE=False
-    command: ["celery", "-A", "dineflow", "worker", "-l", "info", "--concurrency=2"]
+    command: ["celery", "-A", "dineflow", "worker", "-Q", "celery,payments", "-l", "info", "--concurrency=2"]
     depends_on:
       db:
         condition: service_healthy

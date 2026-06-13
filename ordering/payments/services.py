@@ -578,6 +578,22 @@ class WebhookIngestionService:
     def process_log(self, webhook_log):
         # Quick idempotency check without locking
         webhook_log = WebhookLog.objects.select_related("payment_transaction").get(pk=webhook_log.pk)
+        
+        payment = webhook_log.payment_transaction
+        order = payment.order if payment else None
+        
+        PaymentEvent.objects.create(
+            event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_STARTED,
+            event_status=PaymentEvent.EventStatus.INFO,
+            transaction=payment,
+            order=order,
+            order_ref=order.order_ref_snapshot if order else "",
+            restaurant=payment.restaurant if payment else None,
+            amount=payment.amount if payment else Decimal('0.00'),
+            razorpay_payment_id="",
+            metadata={"webhook_log_id": str(webhook_log.id)}
+        )
+
         if webhook_log.processed_at:
             logger.info(
                 "payment_webhook_already_processed provider=%s event_id=%s "
@@ -592,9 +608,6 @@ class WebhookIngestionService:
         payload = json.loads(webhook_log.raw_payload or "{}")
         event = get_gateway(webhook_log.provider).parse_webhook(payload, webhook_log.headers)
         
-        payment = webhook_log.payment_transaction
-        order = payment.order if payment else None
-        
         metadata = {
             "webhook_log_id": str(webhook_log.id),
             "provider_order_id": event.provider_order_id,
@@ -603,18 +616,6 @@ class WebhookIngestionService:
             "transaction_id": str(payment.id) if payment else None,
             "order_id": str(order.id) if order else None,
         }
-
-        PaymentEvent.objects.create(
-            event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_STARTED,
-            event_status=PaymentEvent.EventStatus.INFO,
-            transaction=payment,
-            order=order,
-            order_ref=order.order_ref_snapshot if order else "",
-            restaurant=payment.restaurant if payment else None,
-            amount=payment.amount if payment else Decimal('0.00'),
-            razorpay_payment_id=event.provider_payment_id,
-            metadata=metadata
-        )
 
         try:
             if not payment:

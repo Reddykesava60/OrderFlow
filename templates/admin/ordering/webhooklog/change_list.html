@@ -1,0 +1,30 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+    <div style="margin-bottom: 20px; padding: 15px; border-radius: 5px; 
+                {% if unprocessed_count == 0 %}
+                    background-color: #d1fae5; color: #065f46; border: 1px solid #34d399;
+                {% elif unprocessed_count <= 5 %}
+                    background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24;
+                {% else %}
+                    background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171;
+                {% endif %}
+                ">
+        <h2 style="margin: 0; font-size: 18px; display: flex; align-items: center; justify-content: space-between;">
+            <span>Unprocessed Webhooks:</span>
+            <span style="font-size: 24px; font-weight: bold;">{{ unprocessed_count }}</span>
+        </h2>
+        <p style="margin: 5px 0 0 0; font-size: 13px;">
+            {% if unprocessed_count == 0 %}
+                All healthy. Webhooks are being processed normally.
+            {% elif unprocessed_count <= 5 %}
+                Warning: Some webhooks are delayed. Ensure Celery workers are running.
+            {% else %}
+                Critical: Multiple webhooks are stuck. Check worker health immediately!
+            {% endif %}
+        </p>
+    </div>
+
+    {{ block.super }}
+{% endblock %}

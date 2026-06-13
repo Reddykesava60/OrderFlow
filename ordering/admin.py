@@ -261,3 +261,33 @@ class SettlementAdmin(admin.ModelAdmin):
                 created_by=request.user
             )
 
+# ── WebhookLog Admin ─────────────────────────────────────────────────────────
+
+from ordering.models import WebhookLog
+
+@admin.register(WebhookLog)
+class WebhookLogAdmin(admin.ModelAdmin):
+    change_list_template = "admin/ordering/webhooklog/change_list.html"
+    list_display = [
+        'id_short', 'provider', 'event_type', 'signature_valid', 
+        'processed_at', 'created_at'
+    ]
+    list_filter = ['signature_valid', 'provider', ('processed_at', admin.EmptyFieldListFilter)]
+    search_fields = ['id', 'provider_event_id', 'provider_order_id']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    readonly_fields = [f.name for f in WebhookLog._meta.fields]
+
+    @admin.display(description='ID')
+    def id_short(self, obj):
+        return str(obj.id)[:8]
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        # Compute unprocessed count for the dashboard metric
+        unprocessed_count = WebhookLog.objects.filter(
+            signature_valid=True,
+            processed_at__isnull=True
+        ).count()
+        extra_context['unprocessed_count'] = unprocessed_count
+        return super().changelist_view(request, extra_context=extra_context)
