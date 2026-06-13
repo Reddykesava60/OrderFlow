@@ -273,10 +273,19 @@ class WebhookLogAdmin(admin.ModelAdmin):
         'processed_at', 'created_at'
     ]
     list_filter = ['signature_valid', 'provider', ('processed_at', admin.EmptyFieldListFilter)]
-    search_fields = ['id', 'provider_event_id', 'provider_order_id']
+    search_fields = ['id', 'provider_event_id']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     readonly_fields = [f.name for f in WebhookLog._meta.fields]
+
+    @admin.display(description='Event Type')
+    def event_type(self, obj):
+        import json
+        try:
+            payload = json.loads(obj.raw_payload)
+            return payload.get('event', 'unknown')
+        except Exception:
+            return 'parse_error'
 
     @admin.display(description='ID')
     def id_short(self, obj):
