@@ -29,15 +29,50 @@ The primary state machine revolves around the `Order` aggregate in the `ordering
 - **Trigger**: The Celery expiration task triggers, a failed webhook (`payment.failed`) is processed, or a manual cancellation via the dashboard.
 - **Side Effects**: Reserved stock is released back to `MenuItem.stock`. If paid, a refund sequence is initiated and the Ledger records `DEBIT_REFUND` and `CREDIT_REFUND_REVERSAL`.
 
-## Payment Observability Timeline
+## Payment Observability and Webhook Lifecycle
 
 Every transition in the payment lifecycle is immutably tracked via `PaymentEvent` in the `kitchen` app. This provides a clear audit trail for diagnosing stalled or failed payments.
 
-1. **`RAZORPAY_INITIATED` / `DIGITAL_PAYMENT_INITIATED`**: Logged when the intent is created.
-2. **`WEBHOOK_PROCESSING_STARTED`**: Logged the moment a Celery worker picks up a received webhook log.
-3. **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`**: Logged when the database transaction successfully commits the state change.
-4. **`WEBHOOK_PROCESSING_COMPLETED`**: Logged at the very end of processing, after KDS broadcasts have finished.
-5. **Exception Events**: Events like `WEBHOOK_LOOKUP_FAILED` or `PAYMENT_STATE_TRANSITION_FAILED` are logged with detailed metadata if validation or routing fails.
+### Dedicated Webhook Processing Lifecycle
+
+The end-to-end webhook processing pipeline flows deterministically:
+**Webhook Received** → **WebhookLog Created** → **Task Enqueued** → **`WEBHOOK_PROCESSING_STARTED`** → **Payment Mutation** → **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`** → **`WEBHOOK_PROCESSING_COMPLETED`**
+
+1. **`RAZORPAY_INITIATED` / `DIGITAL_PAYMENT_INITIATED`**: Logged synchronously when the client creates the initial order intent.
+2. **Webhook Receipt**: The `WebhookLog` model acts as an immutable ledger of incoming gateway events. Its fields have specific operational semantics:
+   - `signature_valid`: A boolean indicating if the webhook passed cryptographic verification. Unverified webhooks are ignored by the Celery processor.
+   - `provider_event_id`: Used to track and deduplicate the specific event ID sent by the gateway (e.g., preventing double-processing of the exact same Razorpay event).
+   - `processed_at`: Indicates **terminal processing** (either a successful business logic mutation or a permanent exception like `ValueError`). Crucially, this does NOT necessarily indicate a successful payment mutation. If `processed_at` is `NULL`, the `process_unprocessed_webhooks_task` cron job will continually retry the webhook.
+   - `failed_reason`: Stores the exception traceback if terminal processing failed due to a business logic violation.
+3. **`WEBHOOK_PROCESSING_STARTED`**: Logged the exact moment the Celery worker (`process_payment_webhook_task` or `process_unprocessed_webhooks_task`) begins processing the `WebhookLog`.
+4. **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`**: Logged when the database transaction successfully commits the state change.
+5. **`WEBHOOK_PROCESSING_COMPLETED`**: Logged at the very end of processing, after KDS broadcasts have finished.
+6. **Exception Events**: 
+   - `PAYMENT_TRANSACTION_NOT_FOUND`: Logged if the incoming webhook references an unknown order.
+   - `WEBHOOK_PROCESSING_EXCEPTION`: Logged for general traceback failures (e.g. invalid JSON, missing keys).
+   - `PAYMENT_STATE_TRANSITION_FAILED`: Logged when validation or business rules reject the transition (e.g. incorrect amounts).
+
+## Payment State Transitions
+
+The `PaymentTransaction` state machine enforces strict financial consistency:
+- **`INITIATED` → `PAID`**: The standard success path when a webhook confirms the transaction.
+- **`INITIATED` → `FAILED`**: The standard failure path when a webhook or polling detects a timeout or insufficient funds.
+- **`FAILED` → `PAID` (Late Capture Recovery)**: Allowed exclusively for UPI late captures (see below).
+- **Invalid Transitions**: Any attempt to transition `PAID → FAILED` or `PAID → INITIATED` raises a `ValueError` to prevent financial corruption.
+
+## Late-Captures and Out-of-Order Webhooks
+
+### Known Razorpay Behavior
+In the UPI ecosystem, network timeouts between the user's bank app and the NPCI network frequently cause immediate failures. In these scenarios, Razorpay fires a `payment.failed` webhook. However, the banking network may ultimately clear the transaction 30 seconds to several minutes later. When this happens, Razorpay fires `payment.captured` and `order.paid` webhooks out of order, *after* the failure.
+
+### FAILED -> PAID Recovery
+To prevent financial loss for the user (who was charged) and the restaurant (who never received the order), the `PaymentTransaction` state machine explicitly permits the `FAILED -> PAID` transition. 
+
+When a late-capture webhook arrives:
+1. The `PaymentTransaction` transitions from `FAILED` to `PAID`.
+2. A deterministic recovery flow runs: It checks if `MenuItem` and `AddOn` stock is still available.
+3. If stock is available, it is deducted, the `Order` reopens to `PENDING`, and KDS is notified.
+4. If stock is unavailable (sold out), the `Order` remains `CANCELLED` and operations must manually refund the late capture.
 
 ## Idempotency Workflow
 1. Client generates a unique UUID `Idempotency-Key` locally.

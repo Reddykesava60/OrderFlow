@@ -15,7 +15,7 @@ The KDS domain updates are triggered synchronously from the `ordering` app's mut
 3. **Targeted Redis Group**: These functions send a payload to the specific Restaurant's Redis group (e.g., `Group(f"kds_{restaurant_id}")`).
 4. **WebSocket Delivery**: Django Channels pushes the event down to all connected kitchen devices for that specific restaurant.
 
-*Note: In the current architecture, these `async_to_sync` broadcasts block the calling thread (e.g., the Celery webhook processor). If the Redis connection hangs or drops packets, the worker thread will stall. Future iterations may decouple this by offloading broadcasts to a background Celery task.*
+*Note: During payment investigations, synchronous KDS broadcasting was evaluated as a potential contributor to worker stalls. No conclusive production evidence currently proves Redis/channel-layer hangs were the root cause. Continued monitoring is recommended.*
 
 ## Payload Efficiency
 To ensure the tablets do not crash or stall, the KDS payload is optimized:

@@ -184,7 +184,7 @@ PAYMENT_STATE_TRANSITIONS = {
     PaymentState.INITIATED: {PaymentState.PROCESSING, PaymentState.PAID, PaymentState.FAILED, PaymentState.EXPIRED},
     PaymentState.PROCESSING: {PaymentState.PAID, PaymentState.FAILED, PaymentState.EXPIRED},
     PaymentState.PAID: set(),
-    PaymentState.FAILED: set(),
+    PaymentState.FAILED: {PaymentState.PAID},  # Allowed for late-capture recovery
     PaymentState.REFUNDED: set(),
     PaymentState.EXPIRED: set(),
 }

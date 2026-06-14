@@ -7,37 +7,29 @@ The APIs are built using standard Django views returning JSON responses, utilizi
 
 ---
 
-## Ordering API
+## Ordering API (`ordering/urls.py`)
 
-### POST `/r/{restaurant_slug}/checkout/`
-Places a new order in the system, validates stock, and calculates pricing. This is a traditional Django form submission endpoint that returns a redirect to the payment or success page.
+### `POST /r/<slug:restaurant_slug>/checkout/`
+Places a new order in the system, validates stock, and calculates pricing. This is a traditional Django form submission endpoint that redirects to the payment verification page.
 
-### GET `/payments/status/{payment_id}/`
+## Payments API (`ordering/urls_payments.py`)
+
+### `GET /payments/status/<uuid:payment_id>/`
 Polls the current status of a payment transaction.
+**Response**: `{"id": "uuid", "state": "paid", "amount": "260.00", "order_id": "uuid"}`
 
-**Response (`200 OK`)**:
-```json
-{
-  "id": "uuid",
-  "state": "paid",
-  "amount": "260.00",
-  "order_id": "uuid"
-}
-```
+### `POST /payments/razorpay/verify/`
+Synchronous fast-path verification called by the frontend immediately after the Razorpay checkout modal closes.
 
----
+### `POST /payments/webhook/<str:provider>/`
+Receives asymmetric webhook events from external providers (e.g., `razorpay`). Requires provider-specific signature headers.
+**Response**: `200 OK` (Always returns 200 to prevent gateway retries).
 
-## Payments Webhook API
+## Kitchen API (`kitchen/urls.py`)
 
-### POST `/payments/webhook/{provider}/`
-Receives asymmetric webhook events from external providers (e.g., `razorpay`). 
-Requires provider-specific signature headers (e.g., `X-Razorpay-Signature`).
+### `GET /api/kds/<uuid:restaurant_id>/active-tickets/`
+Fetches the full state of active tickets for a specific restaurant to hydrate the KDS upon initial load or reconnection.
 
-**Processing Flow**:
-1. Request is received and signature is verified.
-2. The raw payload is saved to `WebhookLog`.
-3. A Celery task (`process_payment_webhook_task`) is dispatched to process the webhook asynchronously.
-4. The endpoint immediately returns `200 OK` to prevent gateway retries.
-
-**Response**:
-`200 OK` (Always returns 200 to prevent gateway retries).
+### `POST /api/kds/<uuid:restaurant_id>/tickets/<uuid:order_id>/<str:action>/`
+Transitions a ticket through its states (e.g., `acknowledge`, `complete`).
+**Response**: `{"status": "success", "order_id": "uuid"}`

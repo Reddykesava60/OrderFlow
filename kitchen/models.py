@@ -27,6 +27,13 @@ class PaymentEvent(models.Model):
         WEBHOOK_PROCESSING_EXCEPTION = 'WEBHOOK_PROCESSING_EXCEPTION', 'Webhook Processing Exception'
         PAYMENT_TRANSACTION_NOT_FOUND = 'PAYMENT_TRANSACTION_NOT_FOUND', 'Payment Transaction Not Found'
         PAYMENT_STATE_TRANSITION_FAILED = 'PAYMENT_STATE_TRANSITION_FAILED', 'Payment State Transition Failed'
+        
+        # Late-Capture Recovery Events
+        LATE_CAPTURE_RECEIVED      = 'LATE_CAPTURE_RECEIVED',      'Late Capture Received'
+        ORDER_RECOVERY_STARTED     = 'ORDER_RECOVERY_STARTED',     'Order Recovery Started'
+        ORDER_RECOVERED            = 'ORDER_RECOVERED',            'Order Recovered'
+        ORDER_RECOVERY_FAILED      = 'ORDER_RECOVERY_FAILED',      'Order Recovery Failed'
+        PAYMENT_RECOVERY_REQUIRED  = 'PAYMENT_RECOVERY_REQUIRED',  'Payment Recovery Required'
 
     class EventStatus(models.TextChoices):
         INFO = 'INFO', 'Info'

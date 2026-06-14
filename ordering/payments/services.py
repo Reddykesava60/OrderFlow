@@ -343,6 +343,25 @@ class PaymentMutationService:
                     "order_restaurant_id": str(order.restaurant_id)
                 })
 
+            is_late_capture = (payment.state == PaymentState.FAILED)
+            
+            if is_late_capture:
+                logger.info("Late capture received for payment %s (Order %s)", payment.id, order.id)
+                PaymentEvent.objects.create(
+                    event_type=PaymentEvent.EventType.LATE_CAPTURE_RECEIVED,
+                    event_status=PaymentEvent.EventStatus.INFO,
+                    transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                    restaurant=payment.restaurant, amount=payment.amount,
+                    razorpay_payment_id=event.provider_payment_id, metadata=metadata
+                )
+                PaymentEvent.objects.create(
+                    event_type=PaymentEvent.EventType.ORDER_RECOVERY_STARTED,
+                    event_status=PaymentEvent.EventStatus.INFO,
+                    transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                    restaurant=payment.restaurant, amount=payment.amount,
+                    razorpay_payment_id=event.provider_payment_id, metadata=metadata
+                )
+
             StockReservation.objects.select_for_update().filter(order=order, is_confirmed=False).update(is_confirmed=True)
             now = timezone.now()
             payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
@@ -351,6 +370,7 @@ class PaymentMutationService:
             payment.version += 1
             payment.save(update_fields=["provider_payment_id", "paid_at", "state", "version", "updated_at"])
 
+            recovery_failed = False
             if order.status == Order.Status.UNPAID:
                 order.status = Order.Status.PENDING
                 order.paid_at = now
@@ -359,6 +379,68 @@ class PaymentMutationService:
                     order.razorpay_payment_id = payment.provider_payment_id
                     update_fields.append("razorpay_payment_id")
                 order.save(update_fields=update_fields)
+            elif is_late_capture and order.status == Order.Status.CANCELLED:
+                # Deterministic Late-Capture Recovery Workflow
+                from core.models import MenuItem, AddOn
+                from django.db import models as db_models
+                
+                # Snapshot stock
+                insufficient_stock = False
+                snapshot_meta = {"items": []}
+                for item in order.items.all():
+                    if item.menu_item and item.menu_item.stock is not None:
+                        current = MenuItem.objects.select_for_update().get(pk=item.menu_item_id).stock
+                        snapshot_meta["items"].append({"menu_item_id": str(item.menu_item_id), "required": item.quantity, "available": current})
+                        if current < item.quantity:
+                            insufficient_stock = True
+                    for addon in item.addons.all():
+                        if addon.addon and addon.addon.stock is not None:
+                            current_addon = AddOn.objects.select_for_update().get(pk=addon.addon_id).stock
+                            snapshot_meta["items"].append({"addon_id": str(addon.addon_id), "required": addon.quantity, "available": current_addon})
+                            if current_addon < addon.quantity:
+                                insufficient_stock = True
+                
+                if insufficient_stock:
+                    recovery_failed = True
+                    logger.warning("Order %s recovery failed due to insufficient stock", order.id)
+                    PaymentEvent.objects.create(
+                        event_type=PaymentEvent.EventType.ORDER_RECOVERY_FAILED,
+                        event_status=PaymentEvent.EventStatus.FAILED,
+                        transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                        restaurant=payment.restaurant, amount=payment.amount,
+                        razorpay_payment_id=event.provider_payment_id, metadata={"snapshot": snapshot_meta, **metadata}
+                    )
+                    PaymentEvent.objects.create(
+                        event_type=PaymentEvent.EventType.PAYMENT_RECOVERY_REQUIRED,
+                        event_status=PaymentEvent.EventStatus.WARNING,
+                        transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                        restaurant=payment.restaurant, amount=payment.amount,
+                        razorpay_payment_id=event.provider_payment_id, metadata=metadata
+                    )
+                else:
+                    # Deduct stock
+                    for item in order.items.all():
+                        if item.menu_item and item.menu_item.stock is not None:
+                            MenuItem.objects.filter(pk=item.menu_item_id).update(stock=db_models.F('stock') - item.quantity)
+                        for addon in item.addons.all():
+                            if addon.addon and addon.addon.stock is not None:
+                                AddOn.objects.filter(pk=addon.addon_id).update(stock=db_models.F('stock') - addon.quantity)
+                    
+                    order.status = Order.Status.PENDING
+                    order.paid_at = now
+                    update_fields = ["status", "paid_at"]
+                    if payment.provider == PaymentProvider.RAZORPAY:
+                        order.razorpay_payment_id = payment.provider_payment_id
+                        update_fields.append("razorpay_payment_id")
+                    order.save(update_fields=update_fields)
+                    
+                    PaymentEvent.objects.create(
+                        event_type=PaymentEvent.EventType.ORDER_RECOVERED,
+                        event_status=PaymentEvent.EventStatus.SUCCESS,
+                        transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                        restaurant=payment.restaurant, amount=payment.amount,
+                        razorpay_payment_id=event.provider_payment_id, metadata=metadata
+                    )
 
             event_type = PaymentEvent.EventType.RAZORPAY_CONFIRMED if payment.provider == PaymentProvider.RAZORPAY else PaymentEvent.EventType.DIGITAL_PAYMENT_CONFIRMED
             initiated_event_type = PaymentEvent.EventType.RAZORPAY_INITIATED if payment.provider == PaymentProvider.RAZORPAY else PaymentEvent.EventType.DIGITAL_PAYMENT_INITIATED
@@ -412,8 +494,10 @@ class PaymentMutationService:
 
         # Side effects AFTER transaction commits — prevents KDS showing paid state
         # that gets rolled back if a later step in the transaction fails.
-        trigger_kds_refresh(order.restaurant_id)
-        broadcast_payment_update(payment.restaurant_id, payment.id, payment.state, payment.order_id)
+        if not recovery_failed:
+            trigger_kds_refresh(payment.restaurant_id)
+            broadcast_payment_update(payment.restaurant_id, payment.id, payment.state, payment.order_id)
+        
         return payment
 
     def mark_failed(self, payment, event, metadata=None):
@@ -663,8 +747,23 @@ class WebhookIngestionService:
             )
         except Exception as exc:
             import traceback
+            
+            # For business logic or invalid state transitions, mark as terminal (so it won't retry forever)
+            is_terminal = isinstance(exc, (ValueError, PaymentValidationError, PaymentGatewayError))
+            
             webhook_log.failed_reason = str(exc)
-            webhook_log.save(update_fields=["failed_reason"])
+            update_fields = ["failed_reason"]
+            
+            if is_terminal:
+                webhook_log.processed_at = timezone.now()
+                update_fields.append("processed_at")
+                logger.warning(
+                    "terminal_webhook_exception provider=%s event_id=%s payment_id=%s exc=%s",
+                    webhook_log.provider, webhook_log.provider_event_id,
+                    webhook_log.payment_transaction_id, exc
+                )
+                
+            webhook_log.save(update_fields=update_fields)
             
             exc_meta = metadata.copy()
             exc_meta["exception_type"] = type(exc).__name__
