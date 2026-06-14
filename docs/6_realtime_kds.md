@@ -8,20 +8,22 @@ The Kitchen Display System (KDS) is a critical component that requires real-time
 - **Channels Redis**: The backing layer for cross-process channel groups.
 
 ## Event-Driven Updates
-The KDS domain heavily relies on the internal `EventBus`. 
+The KDS domain updates are triggered synchronously from the `ordering` app's mutation services using `async_to_sync` calls to the channel layer.
 
-1. **Order Paid**: The `sales` domain transitions the order to `PENDING` and publishes `OrderPaidEvent`. 
-2. **KDS Broadcaster**: A handler in the `kitchen` domain listens to `OrderPaidEvent` and prepares a localized JSON payload.
-3. **Targeted Redis Group**: The broadcaster sends the payload to the specific Restaurant's Redis group (e.g., `Group(f"kds_{restaurant_id}")`).
+1. **Order State Mutation**: When `PaymentMutationService` processes a webhook or synchronous API confirmation, it commits the database transaction.
+2. **KDS Broadcaster**: Immediately following the commit, `trigger_kds_refresh(restaurant_id)` and `broadcast_payment_update(restaurant_id, payment_id)` are called.
+3. **Targeted Redis Group**: These functions send a payload to the specific Restaurant's Redis group (e.g., `Group(f"kds_{restaurant_id}")`).
 4. **WebSocket Delivery**: Django Channels pushes the event down to all connected kitchen devices for that specific restaurant.
+
+*Note: In the current architecture, these `async_to_sync` broadcasts block the calling thread (e.g., the Celery webhook processor). If the Redis connection hangs or drops packets, the worker thread will stall. Future iterations may decouple this by offloading broadcasts to a background Celery task.*
 
 ## Payload Efficiency
 To ensure the tablets do not crash or stall, the KDS payload is optimized:
-- **Diff Broadcasting**: Instead of sending the entire list of 100+ orders, the server only broadcasts the precise differential update.
-  - `{"type": "TICKET_CREATED", "payload": {...}}`
-  - `{"type": "ITEM_UPDATED", "item_id": "uuid", "new_state": "PREPARING"}`
-- **Client-Side Merging**: The frontend (Alpine.js / React) maintains the state in-memory and merges the differential updates, ensuring instant UI reflection.
+- **Diff Broadcasting**: Instead of sending the entire list of 100+ orders, the server broadcasts differential updates.
+  - `{"type": "kds.refresh", "action": "refresh", "order_id": "uuid"}`
+  - `{"type": "payment.update", "payment_id": "uuid", "state": "paid"}`
+- **Client-Side Merging**: The frontend maintains the state in-memory and merges the differential updates, ensuring instant UI reflection.
 
 ## Fault Tolerance
 - **Reconnection Logic**: If a kitchen tablet drops WiFi, the WebSocket automatically attempts reconnection with an exponential backoff.
-- **State Hydration**: Upon successful reconnection, the tablet makes a standard REST API call `GET /api/kitchen/{restaurant_id}/active-tickets` to hydrate the full state and ensure no diffs were missed during the downtime.
+- **State Hydration**: Upon successful reconnection, the tablet makes a standard REST API call to hydrate the full state and ensure no diffs were missed during the downtime.

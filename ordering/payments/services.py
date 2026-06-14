@@ -417,11 +417,13 @@ class PaymentMutationService:
         return payment
 
     def mark_failed(self, payment, event, metadata=None):
+        logger.info("MARK_FAILED: Entered mark_failed for payment %s", payment.id)
         if metadata is None:
             metadata = {}
         with transaction.atomic():
             payment = PaymentTransaction.objects.select_for_update().select_related("order", "order__restaurant").get(pk=payment.pk)
             if payment.state in (PaymentState.PAID, PaymentState.REFUNDED):
+                logger.info("MARK_FAILED: Payment already paid/refunded")
                 return payment
             payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
             if payment.can_transition_to(PaymentState.FAILED):
@@ -473,8 +475,13 @@ class PaymentMutationService:
                 )
 
         # Side effects AFTER transaction commits
+        logger.info("MARK_FAILED: Entering trigger_kds_refresh for restaurant %s", payment.restaurant_id)
         trigger_kds_refresh(payment.restaurant_id)
+        logger.info("MARK_FAILED: Exited trigger_kds_refresh")
+        
+        logger.info("MARK_FAILED: Entering broadcast_payment_update for payment %s", payment.id)
         broadcast_payment_update(payment.restaurant_id, payment.id, payment.state, payment.order_id)
+        logger.info("MARK_FAILED: Exited broadcast_payment_update")
         return payment
 
 class WebhookIngestionService:
@@ -630,6 +637,8 @@ class WebhookIngestionService:
 
             # apply_provider_event manages its own transaction.atomic() internally.
             PaymentMutationService().apply_provider_event(payment, event, metadata)
+            
+            logger.info("PROCESS_LOG: Writing processed_at for webhook_log %s", webhook_log.id)
             webhook_log.processed_at = timezone.now()
             webhook_log.failed_reason = ""
             webhook_log.save(update_fields=["processed_at", "failed_reason"])

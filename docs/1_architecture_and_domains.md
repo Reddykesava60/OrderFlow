@@ -1,28 +1,24 @@
-# Core Architecture & Domain Contexts
+# Core Architecture & App Contexts
 
-## Architectural Pattern: Domain-Driven Modular Monolith
-The Greenfield application adopts a strict Modular Monolith architecture. While running within a single Django process, the application is divided into highly cohesive, loosely coupled Bounded Contexts (domains). 
+## Architectural Pattern: Modular Django Application
+The application adopts a standard Django app structure (Model-Template-View) with decoupled boundary logic. While running within a single Django process, the application is divided into cohesive core apps.
 
 ### Key Principles
-1. **Vertical Slicing**: Each domain owns its models, use cases (services), schemas, and API routers.
-2. **Soft Inter-Domain References**: Domains do not use explicit database Foreign Keys to reference entities in other domains. Instead, they use `models.UUIDField()` soft references (e.g., `restaurant_id`). This guarantees that domains can be extracted into separate microservices in the future without tearing apart the database schema.
-3. **Synchronous Internal Event Bus**: Side effects are completely decoupled using `shared/event_bus.py`. Instead of the `sales` domain importing `finance` to generate ledger entries, it publishes an `OrderPaidEvent`. The `finance` domain subscribes to this event and handles it.
+1. **Vertical Slicing**: Each app owns its models, services, templates, and URLs.
+2. **Standard Django MTV**: The application uses traditional Django Views, Forms, and Templates for the UI, alongside JSON-returning endpoints for client-side interactions.
+3. **Decoupled Side Effects**: Side effects such as real-time WebSocket KDS updates and background webhook processing are decoupled from the main request/response cycle using Django Channels and Celery tasks.
 
-## Bounded Contexts
-| Domain | Responsibility | Interacts With |
+## Core Apps
+| App | Responsibility | Interacts With |
 |--------|----------------|----------------|
-| **identity** | Users, Authentication, Roles | Independent |
-| **operations**| Restaurant configuration, Tenants | Identity (owner role) |
-| **catalog** | Menu items, categories, Addons, Inventory Ledger | Operations (tenant ID) |
-| **customers** | CRM, Customer balances, Counters | Operations (tenant ID) |
-| **sales** | Checkout, Cart Validation, Orders, Line items | Catalog (pricing/stock), Payments (intent) |
-| **payments** | Gateway integrations (Razorpay), Webhooks | Operations (config), Sales (order state) |
-| **finance** | Double-Entry Ledger, Platform Fees, Settlements | Sales (Order revenue) |
-| **kitchen** | KDS, WebSockets, Prep States | Sales (ticket status) |
+| **core** | Identity (Users), Tenants (Restaurants), Catalog (MenuItems, AddOns), Platform Settings | Independent |
+| **ordering** | Sales (Orders, Line Items, Stock Reservations), Payments (Transactions, Webhooks), Finance (Ledger Entries, Settlements) | Core (Pricing/Stock, Tenants) |
+| **kitchen** | Real-time KDS APIs, WebSocket endpoints, Payment Observability (`PaymentEvent`) | Ordering (Order status), Core (Tenants) |
+| **owner** | Dashboard and reporting views for restaurant operators | Core, Ordering |
 
-## The Service Layer (Use Cases)
-Controllers and views (Django Ninja endpoints) are intentionally thin. They map HTTP requests to DTOs and invoke Use Cases.
-The Use Cases (e.g., `PlaceOrderUseCase`, `PaymentUseCases`) encapsulate all business rules, orchestration, and database transactions.
+## The Service Layer
+Controllers and views are kept intentionally thin. They map HTTP requests to services located in `services.py` modules within each app.
+These services (e.g., `PaymentMutationService`, `WebhookIngestionService`) encapsulate business rules, orchestration, and database transactions.
 
 ## Extensibility
-The modular setup ensures that when specific domains require scaling (for instance, the Kitchen WebSocket servers), that specific application slice can be deployed on specialized compute nodes by configuring the HTTP load balancer to route `/api/kitchen` traffic to those nodes.
+Background processing is handled by Celery workers, and WebSocket traffic is managed by Django Channels with a Redis channel layer. This allows scaling specific application slices by routing WebSocket traffic (e.g., `/api/kitchen`) to specialized ASGI nodes, while Celery workers handle background payment reconciliation.
