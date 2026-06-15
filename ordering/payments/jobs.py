@@ -73,6 +73,13 @@ def expire_single_payment_task(self, payment_transaction_id):
                 payment.transition_to(PaymentState.EXPIRED)
                 payment.version += 1
                 payment.save(update_fields=["state", "version", "updated_at"])
+                
+                order = payment.order
+                if order and order.status == order.Status.UNPAID:
+                    from ordering.services import cancel_upi_payment
+                    from kitchen.models import PaymentEvent
+                    cancel_upi_payment(order, PaymentEvent.EventType.PAYMENT_TIMEOUT)
+                
                 return True
         return False
     except Exception as exc:
@@ -102,7 +109,7 @@ def process_unprocessed_webhooks_task(limit=100):
     processed = 0
     qs = (
         WebhookLog.objects
-        .filter(signature_valid=True, processed_at__isnull=True)
+        .filter(signature_valid=True, processed_at__isnull=True, retry_count__lt=3)
         .order_by("created_at")[:limit]
     )
     for webhook_log in qs:

@@ -754,7 +754,7 @@ class WebhookIngestionService:
             webhook_log.failed_reason = str(exc)
             update_fields = ["failed_reason"]
             
-            if is_terminal:
+            if is_terminal or webhook_log.retry_count >= 3:
                 webhook_log.processed_at = timezone.now()
                 update_fields.append("processed_at")
                 logger.warning(
@@ -762,6 +762,9 @@ class WebhookIngestionService:
                     webhook_log.provider, webhook_log.provider_event_id,
                     webhook_log.payment_transaction_id, exc
                 )
+            else:
+                webhook_log.retry_count += 1
+                update_fields.append("retry_count")
                 
             webhook_log.save(update_fields=update_fields)
             

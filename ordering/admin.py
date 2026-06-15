@@ -270,7 +270,7 @@ class WebhookLogAdmin(admin.ModelAdmin):
     change_list_template = "admin/ordering/webhooklog/change_list.html"
     list_display = [
         'id_short', 'provider', 'event_type', 'signature_valid', 
-        'processed_at', 'created_at'
+        'processed_at', 'status_badge', 'created_at'
     ]
     list_filter = ['signature_valid', 'provider', ('processed_at', admin.EmptyFieldListFilter)]
     search_fields = ['id', 'provider_event_id']
@@ -290,6 +290,16 @@ class WebhookLogAdmin(admin.ModelAdmin):
     @admin.display(description='ID')
     def id_short(self, obj):
         return str(obj.id)[:8]
+
+    @admin.display(description='Status')
+    def status_badge(self, obj):
+        if obj.processed_at:
+            if obj.failed_reason:
+                return format_html('<span style="color:white;background:red;padding:2px 6px;border-radius:4px;font-size:10px;">DEAD LETTERED</span><br><span style="font-size:10px;color:red;">Retries: {}</span>', obj.retry_count)
+            return format_html('<span style="color:white;background:green;padding:2px 6px;border-radius:4px;font-size:10px;">PROCESSED</span>')
+        elif obj.retry_count > 0:
+            return format_html('<span style="color:white;background:orange;padding:2px 6px;border-radius:4px;font-size:10px;">RETRYING</span><br><span style="font-size:10px;color:orange;">Retries: {}</span>', obj.retry_count)
+        return format_html('<span style="color:black;background:lightgray;padding:2px 6px;border-radius:4px;font-size:10px;">PENDING</span>')
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}

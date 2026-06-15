@@ -186,7 +186,7 @@ PAYMENT_STATE_TRANSITIONS = {
     PaymentState.PAID: set(),
     PaymentState.FAILED: {PaymentState.PAID},  # Allowed for late-capture recovery
     PaymentState.REFUNDED: set(),
-    PaymentState.EXPIRED: set(),
+    PaymentState.EXPIRED: {PaymentState.PAID},  # Allowed for late-capture recovery after expiration
 }
 
 
@@ -305,6 +305,7 @@ class WebhookLog(models.Model):
     headers = models.JSONField(default=dict, blank=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     failed_reason = models.TextField(blank=True)
+    retry_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
