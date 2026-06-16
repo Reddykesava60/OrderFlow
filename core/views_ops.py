@@ -35,8 +35,8 @@ class PlatformOperationsDashboardView(UserPassesTestMixin, TemplateView):
         platform_fees = fees_agg['total'] or 0
 
         # System Reliability
-        failed_webhooks = WebhookLog.objects.filter(status=WebhookLog.Status.FAILED).count()
-        dlq_size = WebhookLog.objects.filter(status=WebhookLog.Status.DLQ).count()
+        failed_webhooks = WebhookLog.objects.filter(status=WebhookLog.Status.PENDING, retry_count__gt=0).count()
+        dlq_size = WebhookLog.objects.filter(status=WebhookLog.Status.DEAD_LETTERED).count()
 
         # Restaurant Activity
         active_restaurants = Restaurant.objects.filter(is_active=True).count()
