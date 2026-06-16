@@ -262,6 +262,10 @@ class PaymentOrchestratorService:
 
 class PaymentVerificationService:
     def verify_payment(self, payment):
+        if not payment.provider_order_id:
+            logger.warning("verify_payment skipped because provider_order_id is empty for payment %s", payment.id)
+            return payment
+            
         resolved = resolve_payment_config_for_transaction(payment)
         status = get_gateway(payment.provider).get_payment_status(payment.provider_order_id, resolved)
         kind = "payment_paid" if status.state == PaymentState.PAID else "payment_failed" if status.state == PaymentState.FAILED else "ignored"
