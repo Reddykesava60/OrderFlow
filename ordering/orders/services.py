@@ -246,8 +246,6 @@ def cancel_upi_payment(order, event_type):
         if order.status not in (Order.Status.UNPAID,):
             return
         reservations = list(StockReservation.objects.select_for_update().filter(order=order, is_confirmed=False))
-        from ordering.signals import inventory_released
-        inventory_released.send(sender=Order, order=order)
         for res in reservations:
             if res.menu_item and res.menu_item.stock is not None:
                 MenuItem.objects.filter(pk=res.menu_item_id).update(stock=db_models.F('stock') + res.quantity)
@@ -255,6 +253,9 @@ def cancel_upi_payment(order, event_type):
                 AddOn.objects.filter(pk=res.addon_id).update(stock=db_models.F('stock') + res.quantity)
             res.is_confirmed = True
             res.save(update_fields=['is_confirmed'])
+
+        from ordering.signals import inventory_released
+        inventory_released.send(sender=Order, order=order)
         order.status = Order.Status.CANCELLED
         order.save(update_fields=['status'])
         PaymentEvent.objects.create(order=order, order_ref=order.order_ref_snapshot, restaurant=order.restaurant, event_type=event_type, amount=order.total)
