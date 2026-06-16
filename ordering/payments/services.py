@@ -812,10 +812,11 @@ class WebhookIngestionService:
             next_retry_count = webhook_log.retry_count + 1
             if is_terminal or next_retry_count >= 3:
                 webhook_log.processed_at = timezone.now()
+                webhook_log.status = WebhookLog.Status.DEAD_LETTERED
                 if not is_terminal:
                     webhook_log.retry_count = next_retry_count
                     update_fields.append("retry_count")
-                update_fields.append("processed_at")
+                update_fields.extend(["processed_at", "status"])
                 logger.warning(
                     "terminal_webhook_exception provider=%s event_id=%s payment_id=%s exc=%s",
                     webhook_log.provider, webhook_log.provider_event_id,
