@@ -158,27 +158,27 @@
                  </tr>
               </thead>
               <tbody class="divide-y divide-slate-50">
-                 {% for ev in events %}
-                 {% with fr=fee_map|get_item:ev.order_id %}
-                 <tr class="hover:bg-slate-50/30 transition-all {% if ev.event_type == 'PAYMENT_FAILED' or ev.event_type == 'REFUND_FAILED' %}bg-rose-50/20{% endif %}">
+                 {% for ord in orders %}
+                 {% with fr=fee_map|get_item:ord.id %}
+                 <tr class="hover:bg-slate-50/30 transition-all {% if ord.status == 'CANCELLED' %}bg-rose-50/20{% endif %}">
                     <td class="px-6 py-4">
-                       <span class="text-xs font-black text-slate-400 uppercase">{{ ev.created_at|time:"H:i" }}</span>
+                       <span class="text-xs font-black text-slate-400 uppercase">{{ ord.created_at|time:"H:i" }}</span>
                     </td>
                     <td class="px-6 py-4">
-                       <div class="font-bold text-slate-800 text-sm">#{{ ev.order_ref }}</div>
-                       <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">By {{ ev.staff_user.username|default:"System" }}</div>
+                       <div class="font-bold text-slate-800 text-sm">Order #{{ ord.order_number }}</div>
+                       <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{{ ord.get_payment_method_display }}</div>
                     </td>
                     <td class="px-6 py-4">
                        <span class="px-2 py-0.5 rounded text-[8px] font-black uppercase
-                                    {% if ev.event_type == 'CASH_COLLECTED' or ev.event_type == 'RAZORPAY_CONFIRMED' %}bg-emerald-50 text-emerald-600
-                                    {% elif ev.event_type == 'PAYMENT_FAILED' or ev.event_type == 'REFUND_FAILED' %}bg-rose-50 text-rose-600
-                                    {% elif 'REFUND' in ev.event_type %}bg-amber-50 text-amber-600
+                                    {% if ord.status == 'COMPLETED' %}bg-emerald-50 text-emerald-600
+                                    {% elif ord.status == 'CANCELLED' %}bg-rose-50 text-rose-600
+                                    {% elif ord.status == 'UNPAID' %}bg-amber-50 text-amber-600
                                     {% else %}bg-brand-50 text-brand-600{% endif %}">
-                         {{ ev.event_type }}
+                         {{ ord.get_status_display }}
                        </span>
                     </td>
                     <td class="px-6 py-4 text-right">
-                       <div class="text-sm font-black text-slate-900">₹{{ ev.amount }}</div>
+                       <div class="text-sm font-black text-slate-900">₹{{ ord.total }}</div>
                        {% if fr %}
                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5" {% if fr.is_refunded %}style="text-decoration:line-through"{% endif %}>
                           Fee: ₹{{ fr.fee_amount }} ({{ fr.fee_rate_snapshot }}%)

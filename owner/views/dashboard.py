@@ -135,17 +135,18 @@ class ReconcileView(OwnerRequiredMixin, View):
         fee_map = {str(fr.order_id): fr for fr in fee_records if fr.order_id}
         cash_by_staff = list(cash_events.values('staff_user__username').annotate(total=Sum('amount'), count=Count('id')).order_by('-total'))
         post_count = post_orders.count()
+        orders = Order.objects.filter(restaurant=restaurant, created_at__gte=filter_start, created_at__lt=filter_end).order_by('-created_at')
         if request.GET.get('export') == 'csv':
-            return self._export_csv(restaurant, events, fee_records, filter_date)
-        return render(request, 'owner/reconcile.html', {'restaurant': restaurant, 'events': events, 'fee_records': fee_records, 'fee_map': fee_map, 'filter_date': filter_date, 'gross': gross, 'total_fees': total_fees, 'net': net, 'cash_total': cash_total, 'cash_count': cash_count, 'cash_by_staff': cash_by_staff, 'digital_total': digital_total, 'digital_count': digital_count, 'post_total': post_total, 'post_count': post_count, 'month_stats': _month_stats(restaurant)})
+            return self._export_csv(restaurant, orders, fee_records, filter_date)
+        return render(request, 'owner/reconcile.html', {'restaurant': restaurant, 'events': events, 'orders': orders, 'fee_records': fee_records, 'fee_map': fee_map, 'filter_date': filter_date, 'gross': gross, 'total_fees': total_fees, 'net': net, 'cash_total': cash_total, 'cash_count': cash_count, 'cash_by_staff': cash_by_staff, 'digital_total': digital_total, 'digital_count': digital_count, 'post_total': post_total, 'post_count': post_count, 'month_stats': _month_stats(restaurant)})
 
-    def _export_csv(self, restaurant, events, fee_records, filter_date):
+    def _export_csv(self, restaurant, orders, fee_records, filter_date):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="dineflow_{restaurant.slug}_{filter_date}.csv"'
         writer = csv.writer(response)
-        writer.writerow(['Time', 'Order ref', 'Event type', 'Amount', 'Fee amount', 'Fee rate %', 'Refunded', 'Staff'])
-        fee_map = {fr.order_ref: fr for fr in fee_records}
-        for ev in events:
-            fr = fee_map.get(ev.order_ref)
-            writer.writerow([ev.created_at.strftime('%H:%M'), _csv_safe(ev.order_ref), _csv_safe(ev.event_type), ev.amount, fr.fee_amount if fr else '', fr.fee_rate_snapshot if fr else '', 'Yes' if fr and fr.is_refunded else 'No' if fr else '', _csv_safe(ev.staff_user.username) if ev.staff_user else ''])
+        writer.writerow(['Time', 'Order Number', 'Status', 'Payment Method', 'Total', 'Fee amount', 'Fee rate %', 'Refunded'])
+        fee_map = {fr.order_id: fr for fr in fee_records if fr.order_id}
+        for ord in orders:
+            fr = fee_map.get(ord.id)
+            writer.writerow([ord.created_at.strftime('%H:%M'), ord.order_number, ord.get_status_display(), ord.get_payment_method_display(), ord.total, fr.fee_amount if fr else '', fr.fee_rate_snapshot if fr else '', 'Yes' if fr and fr.is_refunded else 'No' if fr else ''])
         return response
