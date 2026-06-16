@@ -93,7 +93,7 @@ def _create_stock_reservations(order, priced_lines):
         if item.stock is not None:
             reservations.append(StockReservation(
                 order=order,
-                content_object=item,
+                menu_item=item,
                 quantity=line['quantity'],
                 expires_at=expires_at
             ))
@@ -102,7 +102,7 @@ def _create_stock_reservations(order, priced_lines):
             if addon.stock is not None:
                 reservations.append(StockReservation(
                     order=order,
-                    content_object=addon,
+                    addon=addon,
                     quantity=addon_line['quantity'],
                     expires_at=expires_at
                 ))
