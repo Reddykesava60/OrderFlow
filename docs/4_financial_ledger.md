@@ -1,38 +1,25 @@
-# Financial Double-Entry Ledger
+# Financial Ledger
 
-The backbone of the restaurant operating system's financial integrity is the Immutable Double-Entry Ledger located in `core/ledger.py`.
+The backbone of the restaurant operating system's financial integrity is the Immutable Ledger located in `core/models.py`.
 
 ## Core Principles
-The system operates on strict double-entry bookkeeping rules to guarantee that no money is ever "lost" or unaccounted for, and that platform fees are deterministically calculated.
+The system operates on strict bookkeeping rules to guarantee that no money is ever "lost" or unaccounted for, and that platform fees are deterministically calculated.
 
-1. **Immutability**: `JournalEntry` and `JournalLine` records are append-only. They are never UPDATED or DELETED.
-2. **Zero-Sum Guarantees**: A `JournalEntry` is only valid if the sum of all its associated `JournalLine` amounts equals exactly `0.00`. This is enforced at the database transaction layer.
-3. **Idempotency**: The `LedgerService` requires an `idempotency_key` (usually the `Order` ID or `PaymentTransaction` ID) to ensure that duplicate webhooks cannot result in duplicate credits.
-
-## Accounts
-The ledger interacts across specific account types defined in `MerchantLedgerBalance`:
-- **`REVENUE`**: Money earned by the restaurant from order sales. (Credits increase balance).
-- **`FEE`**: Money owed to the platform for operational costs. (Debits increase balance).
-- **`PAYOUT`**: Money transferred from the platform to the restaurant's bank account during settlements.
-- **`REFUND`**: Money returned to the customer.
+1. **Immutability**: `LedgerEntry` records are append-only. They are never UPDATED or DELETED.
+2. **Deterministic Balances**: Every `LedgerEntry` calculates and stores the `balance_after`. The system prevents tampering by ensuring the math flows chronologically.
+3. **Denormalization**: To prevent expensive `SUM()` queries across millions of rows, the `MerchantLedgerBalance` table maintains the exact current real-time balance of the restaurant.
 
 ## Standard Order Flow
 
-When a `place_cash_order` or `place_upi_order` is successfully captured, the `order_paid` Domain Event Signal fires. This triggers `LedgerService.record_payment_capture()`.
+When an order is successfully captured and verified via webhook, the system calls `RestaurantLedgerService().record_payment()` inside the same atomic database transaction as the order status update.
 
-Example `JournalEntry` for a ₹500 order with a 5% platform fee (₹25):
-- Line 1: `CREDIT` ₹500 to `REVENUE` (Restaurant earned ₹500)
-- Line 2: `DEBIT` ₹25 to `FEE` (Restaurant owes Platform ₹25)
-- Line 3: `DEBIT` ₹475 to `PAYOUT` (Restaurant will receive ₹475)
+Example `LedgerEntry` logic for a ₹500 order:
+- A new `LedgerEntry` is appended for ₹500 (Type: `CREDIT`).
+- The `MerchantLedgerBalance` is atomically incremented by ₹500.
+- The `LedgerEntry.balance_after` stores the exact balance after this transaction was applied.
 
-*Sum: (+500) + (-25) + (-475) = 0.00*
+Because the ledger enforces strict boundary logic inside `transaction.atomic()`, any partial captures, mismatched amounts, or double-processing will instantly trigger a database rollback, ensuring financial state remains pristine.
 
-Because the ledger enforces strict boundary logic, any partial captures, mismatched amounts, or double-processing will inherently violate the zero-sum rule and trigger an immediate database rollback.
+## Monthly Statements
 
-## Platform Fee Accrual
-
-Alongside the `JournalEntry`, the ledger synchronously creates a `PlatformFeeRecord` which serves as a highly denormalized aggregate specifically optimized for the platform's internal finance team. This prevents the need to calculate platform earnings by scanning millions of `JournalLine` entries on the fly. 
-
-## Settlements
-
-Periodically, a `SettlementBatch` aggregates the un-settled `PAYOUT` ledger lines and issues an API call to the banking provider to deposit funds into the Restaurant's bank account. Once successful, a new `JournalEntry` marks the payout as completed, neutralizing the `PAYOUT` balance.
+Instead of building a real-time banking transfer settlement engine, the system utilizes a `MonthlyPlatformFeeStatement` model. A background cron job (`sync_monthly_statements_task`) runs to automatically aggregate all `LedgerEntry` records for the month and calculate the final platform fee owed by the restaurant. The platform owner can then review these statements and issue physical or standard wire transfers outside of the application.

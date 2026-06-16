@@ -39,11 +39,11 @@ The end-to-end webhook processing pipeline flows deterministically:
 
 1. **`RAZORPAY_INITIATED` / `DIGITAL_PAYMENT_INITIATED`**: Logged synchronously when the client creates the initial order intent.
 2. **Webhook Receipt**: The `WebhookLog` model acts as an immutable ledger of incoming gateway events. Its fields have specific operational semantics:
-   - `status`: Enum tracking the webhook state (`RECEIVED`, `PROCESSED`, `FAILED`, `DLQ`).
+   - `status`: Enum tracking the webhook state (`RECEIVED`, `PROCESSED`, `FAILED`, `DEAD_LETTERED`).
    - `signature_valid`: A boolean indicating if the webhook passed cryptographic verification. Unverified webhooks are ignored by the Celery processor.
    - `provider_event_id`: Used to track and deduplicate the specific event ID sent by the gateway (e.g., preventing double-processing of the exact same Razorpay event).
    - `failed_reason`: Stores the exception traceback if terminal processing failed due to a business logic violation.
-   - `retry_count` and `next_retry_at`: Controls the exponential backoff logic for background tasks to retry processing up to a maximum number of times before permanently landing in the Dead Letter Queue (DLQ).
+   - `retry_count` and `next_retry_at`: Controls the exponential backoff logic for background tasks to retry processing up to a maximum number of times before permanently landing in the Dead Letter Queue (`DEAD_LETTERED`).
 4. **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`**: Logged when the database transaction successfully commits the state change.
 5. **`WEBHOOK_PROCESSING_COMPLETED`**: Logged at the very end of processing, after KDS broadcasts have finished.
 6. **Exception Events**: 
