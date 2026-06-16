@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.db import transaction
 
 from ordering.models import Order, StockReservation
-from ordering.services import cancel_upi_payment, expire_overdue_unpaid_cash_orders, get_cash_payment_timeout_minutes
+from ordering.orders.services import cancel_upi_payment, expire_overdue_unpaid_cash_orders, get_cash_payment_timeout_minutes
 from kitchen.models import PaymentEvent
 
 logger = logging.getLogger(__name__)

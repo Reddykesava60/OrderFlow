@@ -272,7 +272,7 @@ class WebhookLogAdmin(admin.ModelAdmin):
         'id_short', 'provider', 'event_type', 'signature_valid', 
         'processed_at', 'status_badge', 'created_at'
     ]
-    list_filter = ['signature_valid', 'provider', ('processed_at', admin.EmptyFieldListFilter)]
+    list_filter = ['signature_valid', 'provider', 'status']
     search_fields = ['id', 'provider_event_id']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
@@ -293,9 +293,9 @@ class WebhookLogAdmin(admin.ModelAdmin):
 
     @admin.display(description='Status')
     def status_badge(self, obj):
-        if obj.processed_at:
-            if obj.failed_reason:
-                return format_html('<span style="color:white;background:red;padding:2px 6px;border-radius:4px;font-size:10px;">DEAD LETTERED</span><br><span style="font-size:10px;color:red;">Retries: {}</span>', obj.retry_count)
+        if obj.status == WebhookLog.Status.DEAD_LETTERED:
+            return format_html('<span style="color:white;background:red;padding:2px 6px;border-radius:4px;font-size:10px;">DEAD LETTERED</span><br><span style="font-size:10px;color:red;">Retries: {}</span>', obj.retry_count)
+        elif obj.status == WebhookLog.Status.PROCESSED:
             return format_html('<span style="color:white;background:green;padding:2px 6px;border-radius:4px;font-size:10px;">PROCESSED</span>')
         elif obj.retry_count > 0:
             return format_html('<span style="color:white;background:orange;padding:2px 6px;border-radius:4px;font-size:10px;">RETRYING</span><br><span style="font-size:10px;color:orange;">Retries: {}</span>', obj.retry_count)
@@ -306,7 +306,11 @@ class WebhookLogAdmin(admin.ModelAdmin):
         # Compute unprocessed count for the dashboard metric
         unprocessed_count = WebhookLog.objects.filter(
             signature_valid=True,
-            processed_at__isnull=True
+            status=WebhookLog.Status.PENDING
+        ).count()
+        dead_lettered_count = WebhookLog.objects.filter(
+            status=WebhookLog.Status.DEAD_LETTERED
         ).count()
         extra_context['unprocessed_count'] = unprocessed_count
+        extra_context['dead_lettered_count'] = dead_lettered_count
         return super().changelist_view(request, extra_context=extra_context)

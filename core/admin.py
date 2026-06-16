@@ -11,9 +11,10 @@ import csv
 
 from .models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
-    MonthlyPlatformFeeStatement,
-    PlatformFeeRecord, PlatformSettings,
-    Restaurant, RestaurantConfig, RestaurantPaymentConfig, StaffFilter, User,
+    JournalEntry, JournalLine, MonthlyPlatformFeeStatement,
+    PlatformFeeRecord, PlatformSettings, Restaurant,
+    MerchantLedgerBalance, RestaurantConfig, RestaurantPaymentConfig,
+    SettlementBatch, SettlementRecord, StaffFilter, User,
 )
 from .timeutils import local_day_bounds
 
@@ -384,3 +385,39 @@ class MenuItemAddOnAdmin(admin.ModelAdmin):
     list_filter   = ['menu_item__restaurant']
     search_fields = ['menu_item__name', 'addon__name']
     autocomplete_fields = ['menu_item', 'addon']
+
+
+# ── Ledger Admin ─────────────────────────────────────────────────────────────
+
+@admin.register(MerchantLedgerBalance)
+class MerchantLedgerBalanceAdmin(admin.ModelAdmin):
+    list_display = ('restaurant', 'available_balance', 'pending_settlement', 'updated_at')
+    search_fields = ('restaurant__name',)
+    readonly_fields = ('available_balance', 'pending_settlement', 'updated_at')
+
+class JournalLineInline(admin.TabularInline):
+    model = JournalLine
+    extra = 0
+    readonly_fields = ('account_type', 'amount', 'created_at')
+    can_delete = False
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'restaurant', 'entry_type', 'reference_id', 'created_at')
+    list_filter = ('entry_type', 'created_at')
+    search_fields = ('restaurant__name', 'reference_id')
+    readonly_fields = ('id', 'restaurant', 'entry_type', 'reference_id', 'created_at')
+    inlines = [JournalLineInline]
+
+@admin.register(SettlementBatch)
+class SettlementBatchAdmin(admin.ModelAdmin):
+    list_display = ('id', 'status', 'total_amount', 'created_at', 'processed_at')
+    list_filter = ('status', 'created_at')
+    readonly_fields = ('id', 'status', 'total_amount', 'created_at', 'processed_at')
+
+@admin.register(SettlementRecord)
+class SettlementRecordAdmin(admin.ModelAdmin):
+    list_display = ('id', 'restaurant', 'batch', 'amount', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('restaurant__name', 'batch__id')
+    readonly_fields = ('id', 'restaurant', 'batch', 'amount', 'status', 'provider_transfer_id', 'created_at', 'updated_at')

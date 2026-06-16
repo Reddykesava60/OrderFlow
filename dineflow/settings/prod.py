@@ -50,42 +50,51 @@ DATABASES['default']['CONN_MAX_AGE'] = 60
 
 REDIS_URL = config('REDIS_URL', default='')
 
-if REDIS_URL:
-    redis_url = urlparse(REDIS_URL)
-    if redis_url.scheme not in ('redis', 'rediss'):
-        raise ImproperlyConfigured('REDIS_URL must use redis:// or rediss://.')
-    if redis_url.hostname in ('redis', 'localhost', '127.0.0.1') and not redis_url.password:
-        raise ImproperlyConfigured('Self-hosted production Redis must require a password.')
+if not REDIS_URL:
+    raise ImproperlyConfigured('REDIS_URL is required in production environments.')
 
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': REDIS_URL,
-            'TIMEOUT': 300,
-        },
-    }
+redis_url = urlparse(REDIS_URL)
+if redis_url.scheme not in ('redis', 'rediss'):
+    raise ImproperlyConfigured('REDIS_URL must use redis:// or rediss://.')
+if redis_url.hostname in ('redis', 'localhost', '127.0.0.1') and not redis_url.password:
+    raise ImproperlyConfigured('Self-hosted production Redis must require a password.')
 
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [REDIS_URL],
-            },
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
+    },
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [REDIS_URL],
         },
-    }
-else:
-    # Fallback for pre-deploy / migrations (Redis not yet available)
-    import logging
-    logging.getLogger('dineflow.settings').warning(
-        'REDIS_URL not set — using in-memory cache and channel layer. '
-        'This is acceptable during migrations but not for runtime.'
+    },
+}
+
+# ── Observability: Sentry ────────────────────────────────────────────────────
+SENTRY_DSN = config('SENTRY_DSN', default='')
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            RedisIntegration(),
+        ],
+        traces_sample_rate=config('SENTRY_TRACES_SAMPLE_RATE', default=0.2, cast=float),
+        send_default_pii=True
     )
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        },
-    }
-    # CHANNEL_LAYERS stays as InMemoryChannelLayer from base.py
+
 
 
 # Railway handles SSL termination at the proxy layer and sends
@@ -160,6 +169,8 @@ LOGGING['loggers']['django.request']['level'] = 'WARNING'
 if REDIS_URL:
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
+else:
+    raise ImproperlyConfigured('REDIS_URL is required for Celery in production.')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

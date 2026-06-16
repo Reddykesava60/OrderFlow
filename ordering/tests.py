@@ -12,17 +12,12 @@ from core.models import MenuItem, PlatformSettings, Restaurant
 from core.models import PlatformFeeRecord
 from kitchen.models import PaymentEvent
 
-from .models import Order, PaymentState, PaymentTransaction, WebhookLog
+from .models import Order, OrderItem, PaymentState, PaymentTransaction, StockReservation, WebhookLog
+from .payments.contracts import ProviderWebhookEvent
+from .payments.services import PaymentMutationService, WebhookIngestionService
 from .payments.services import get_payment_access_token
-from .services import (
-    CartError,
-    PaymentConfigurationError,
-    confirm_cash_payment,
-    expire_overdue_unpaid_cash_orders,
-    get_restaurant_payment_config,
-    place_cash_order,
-    place_upi_order,
-)
+from .checkout.services import CartError, PaymentConfigurationError, get_restaurant_payment_config, place_cash_order, place_upi_order
+from .orders.services import confirm_cash_payment, expire_overdue_unpaid_cash_orders
 
 
 class CashTimeoutTests(TestCase):
@@ -550,3 +545,349 @@ class TestPaymentJobsSerialization(TestCase):
         except TypeError as e:
             self.fail(f"reconcile_payment_task result is not JSON serializable: {e}")
         self.assertEqual(result.get('payment_transaction_id'), str(self.payment.id))
+
+
+class TestUpiPaymentStateIntegrity(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name='Integrity Test', slug='integrity-test')
+        self.item = MenuItem.objects.create(
+            restaurant=self.restaurant,
+            name='Dosa',
+            base_price=Decimal('90.00'),
+            stock=10,
+        )
+        payment_config = self.restaurant.payment_config
+        payment_config.razorpay_key_id = 'rzp_test_integrity123'
+        payment_config.razorpay_key_secret = 'test_secret_123'
+        payment_config.razorpay_webhook_secret = 'whsec_test_123'
+        payment_config.is_active = True
+        payment_config.save()
+
+    def _place_reserved_upi_order(self, *, provider_order_id='order_integrity_123'):
+        order = place_upi_order(
+            self.restaurant,
+            cart_lines=[{
+                'item_id': str(self.item.id),
+                'quantity': 1,
+                'dining_option': 'DINE_IN',
+                'addons': [],
+            }],
+            customer_name='Meena',
+            table_number='B2',
+        )
+        Order.objects.filter(pk=order.pk).update(razorpay_order_id=provider_order_id)
+        order.refresh_from_db()
+        payment = PaymentTransaction.objects.create(
+            restaurant=self.restaurant,
+            order=order,
+            provider='razorpay',
+            provider_order_id=provider_order_id,
+            state=PaymentState.INITIATED,
+            amount=order.total,
+            currency='INR',
+            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+        )
+        self.item.refresh_from_db()
+        return order, payment
+
+    def _event(self, kind, provider_payment_id='pay_integrity_123'):
+        return ProviderWebhookEvent(
+            kind=kind,
+            provider_order_id='order_integrity_123',
+            provider_payment_id=provider_payment_id,
+            amount=Decimal('90.00'),
+            raw={'source': 'test'},
+        )
+
+    def _signed_headers(self, body):
+        signature = hmac.new(
+            self.restaurant.payment_config.razorpay_webhook_secret.encode('utf-8'),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+        return {'X-Razorpay-Signature': signature}
+
+    def _webhook_payload(self, event_name, provider_order_id='order_integrity_123', provider_payment_id='pay_integrity_123', event_id='evt_integrity_123'):
+        return {
+            'id': event_id,
+            'event': event_name,
+            'payload': {
+                'payment': {
+                    'entity': {
+                        'id': provider_payment_id,
+                        'order_id': provider_order_id,
+                        'amount': 9000,
+                    }
+                },
+                'order': {
+                    'entity': {
+                        'id': provider_order_id,
+                    }
+                },
+            },
+        }
+
+    @patch('ordering.payments.jobs.PaymentReconciliationService')
+    def test_payment_timeout_abandoned_upi_flow_restores_stock_once(self, mock_reconciliation):
+        # Initial state: UPI order holds one stock unit with an initiated payment.
+        order, payment = self._place_reserved_upi_order()
+        mock_reconciliation.return_value.reconcile_payment.return_value = payment
+        PaymentTransaction.objects.filter(pk=payment.pk).update(
+            expires_at=timezone.now() - timezone.timedelta(minutes=1)
+        )
+        payment.refresh_from_db()
+
+        # Action: scheduled payment expiration runs after the user abandons UPI.
+        from ordering.payments.jobs import expire_single_payment_task
+        expired = expire_single_payment_task(payment.id)
+
+        # Expected/actual: payment expired, order cancelled, stock restored once.
+        self.assertTrue(expired)
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.EXPIRED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 10)
+        self.assertFalse(StockReservation.objects.filter(order=order, is_confirmed=False).exists())
+
+    def test_payment_failed_webhook_cancels_order_and_restores_stock_once(self):
+        # Initial state: UPI order stock is held.
+        order, payment = self._place_reserved_upi_order()
+
+        # Action: provider reports payment.failed.
+        PaymentMutationService().mark_failed(payment, self._event('payment_failed', 'pay_failed_123'))
+
+        # Expected/actual: failure is terminal for the order and inventory is restored.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.FAILED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 10)
+
+    def test_payment_captured_webhook_confirms_order_and_keeps_stock_deducted(self):
+        # Initial state: UPI order stock is held.
+        order, payment = self._place_reserved_upi_order()
+
+        # Action: provider reports payment.captured.
+        PaymentMutationService().mark_paid(payment, self._event('payment_paid', 'pay_captured_123'))
+
+        # Expected/actual: payment and order are active, stock remains deducted.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.PAID)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(self.item.stock, 9)
+
+    def test_duplicate_payment_failed_is_idempotent(self):
+        # Initial state: UPI order stock is held.
+        order, payment = self._place_reserved_upi_order()
+        event = self._event('payment_failed', 'pay_failed_dupe')
+
+        # Action: duplicate payment.failed mutations arrive.
+        PaymentMutationService().mark_failed(payment, event)
+        PaymentMutationService().mark_failed(payment, event)
+
+        # Expected/actual: stock is restored once, order remains cancelled.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.FAILED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 10)
+
+    def test_duplicate_payment_captured_is_idempotent(self):
+        # Initial state: UPI order stock is held.
+        order, payment = self._place_reserved_upi_order()
+        event = self._event('payment_paid', 'pay_captured_dupe')
+
+        # Action: duplicate payment.captured mutations arrive.
+        PaymentMutationService().mark_paid(payment, event)
+        PaymentMutationService().mark_paid(payment, event)
+
+        # Expected/actual: payment/order are active and stock is not deducted twice.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.PAID)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(self.item.stock, 9)
+        self.assertEqual(
+            PaymentEvent.objects.filter(
+                order=order,
+                event_type=PaymentEvent.EventType.RAZORPAY_CONFIRMED,
+                razorpay_payment_id='pay_captured_dupe',
+            ).count(),
+            1,
+        )
+
+    @patch('ordering.payments.jobs.PaymentReconciliationService')
+    def test_expired_to_paid_late_capture_recovers_order_and_inventory(self, mock_reconciliation):
+        # Initial state: abandoned UPI order has expired and stock has been restored.
+        order, payment = self._place_reserved_upi_order()
+        mock_reconciliation.return_value.reconcile_payment.return_value = payment
+        PaymentTransaction.objects.filter(pk=payment.pk).update(
+            expires_at=timezone.now() - timezone.timedelta(minutes=1)
+        )
+        from ordering.payments.jobs import expire_single_payment_task
+        expire_single_payment_task(payment.id)
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.EXPIRED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 10)
+
+        # Action: delayed payment.captured arrives after expiration.
+        PaymentMutationService().mark_paid(payment, self._event('payment_paid', 'pay_late_capture'))
+
+        # Expected/actual: order is recovered, payment is paid, inventory is re-deducted.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.PAID)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(self.item.stock, 9)
+        self.assertTrue(
+            StockReservation.objects.filter(order=order, is_confirmed=True).count() >= 2
+        )
+
+    @patch('ordering.payments.jobs.PaymentReconciliationService')
+    def test_late_capture_with_insufficient_inventory_requires_manual_recovery(self, mock_reconciliation):
+        # Initial state: abandoned UPI order expired, then stock is consumed elsewhere.
+        order, payment = self._place_reserved_upi_order()
+        mock_reconciliation.return_value.reconcile_payment.return_value = payment
+        PaymentTransaction.objects.filter(pk=payment.pk).update(
+            expires_at=timezone.now() - timezone.timedelta(minutes=1)
+        )
+        from ordering.payments.jobs import expire_single_payment_task
+        expire_single_payment_task(payment.id)
+        MenuItem.objects.filter(pk=self.item.pk).update(stock=0)
+        payment.refresh_from_db()
+
+        # Action: delayed payment.captured arrives but inventory cannot be reserved.
+        PaymentMutationService().mark_paid(payment, self._event('payment_paid', 'pay_late_manual'))
+
+        # Expected/actual: no paid/cancelled inconsistency is created; manual alert exists.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.EXPIRED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 0)
+        self.assertTrue(payment.metadata.get('manual_recovery_required'))
+        self.assertTrue(
+            PaymentEvent.objects.filter(
+                order=order,
+                event_type=PaymentEvent.EventType.PAYMENT_RECOVERY_REQUIRED,
+                razorpay_payment_id='pay_late_manual',
+            ).exists()
+        )
+
+    def test_duplicate_captured_webhook_log_is_idempotent(self):
+        # Initial state: valid unpaid UPI payment.
+        order, payment = self._place_reserved_upi_order()
+        payload = self._webhook_payload('payment.captured', event_id='evt_capture_dupe')
+        body = json.dumps(payload).encode('utf-8')
+        headers = self._signed_headers(body)
+
+        # Action: duplicate webhook deliveries are received and processed.
+        log1 = WebhookIngestionService().receive('razorpay', body, headers)
+        log2 = WebhookIngestionService().receive('razorpay', body, headers)
+        WebhookIngestionService().process_log(log1)
+        WebhookIngestionService().process_log(log2)
+
+        # Expected/actual: one WebhookLog, one confirmation, stock deducted once.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(log1.id, log2.id)
+        self.assertEqual(WebhookLog.objects.filter(provider_event_id='evt_capture_dupe').count(), 1)
+        self.assertEqual(payment.state, PaymentState.PAID)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(self.item.stock, 9)
+
+    def test_duplicate_failed_webhook_log_is_idempotent(self):
+        # Initial state: valid unpaid UPI payment.
+        order, payment = self._place_reserved_upi_order()
+        payload = self._webhook_payload('payment.failed', provider_payment_id='pay_failed_webhook', event_id='evt_failed_dupe')
+        body = json.dumps(payload).encode('utf-8')
+        headers = self._signed_headers(body)
+
+        # Action: duplicate failed webhook deliveries are received and processed.
+        log1 = WebhookIngestionService().receive('razorpay', body, headers)
+        log2 = WebhookIngestionService().receive('razorpay', body, headers)
+        WebhookIngestionService().process_log(log1)
+        WebhookIngestionService().process_log(log2)
+
+        # Expected/actual: one WebhookLog, stock restored once, order cancelled.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(log1.id, log2.id)
+        self.assertEqual(WebhookLog.objects.filter(provider_event_id='evt_failed_dupe').count(), 1)
+        self.assertEqual(payment.state, PaymentState.FAILED)
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+        self.assertEqual(self.item.stock, 10)
+
+    def test_concurrent_style_duplicate_webhook_delivery_same_event_is_safe(self):
+        # Initial state: two queued tasks receive the same provider event.
+        order, payment = self._place_reserved_upi_order()
+        payload = self._webhook_payload('payment.captured', event_id='evt_same_event_race')
+        body = json.dumps(payload).encode('utf-8')
+        headers = self._signed_headers(body)
+        log = WebhookIngestionService().receive('razorpay', body, headers)
+
+        # Action: the same log is processed twice, as can happen after retries/restarts.
+        from ordering.payments.jobs import process_payment_webhook_task
+        first = process_payment_webhook_task(log.id)
+        second = process_payment_webhook_task(log.id)
+
+        # Expected/actual: both task calls complete without duplicate side effects.
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(first['status'], 'processed')
+        self.assertEqual(second['status'], 'processed')
+        self.assertEqual(payment.state, PaymentState.PAID)
+        self.assertEqual(order.status, Order.Status.PENDING)
+        self.assertEqual(self.item.stock, 9)
+        self.assertEqual(
+            PaymentEvent.objects.filter(
+                order=order,
+                event_type=PaymentEvent.EventType.RAZORPAY_CONFIRMED,
+                razorpay_payment_id='pay_integrity_123',
+            ).count(),
+            1,
+        )
+
+    @patch('ordering.views.razorpay.Client')
+    def test_frontend_verify_does_not_mark_paid_when_provider_fetch_fails(self, mock_razorpay_client):
+        # Initial state: checkout signature is valid but provider status is unavailable.
+        order, payment = self._place_reserved_upi_order()
+        mock_client = mock_razorpay_client.return_value
+        mock_client.utility.verify_payment_signature.return_value = None
+        mock_client.payment.fetch.side_effect = Exception('provider unavailable')
+
+        # Action: frontend verify endpoint is called.
+        response = self.client.post(
+            '/payments/razorpay/verify/',
+            data=json.dumps({
+                'razorpay_order_id': order.razorpay_order_id,
+                'razorpay_payment_id': 'pay_fetch_down',
+                'razorpay_signature': 'valid_signature',
+            }).encode('utf-8'),
+            content_type='application/json',
+        )
+
+        # Expected/actual: provider truth is unavailable, so no state advances.
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()['error'], 'PAYMENT_VERIFICATION_UNAVAILABLE')
+        payment.refresh_from_db()
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(payment.state, PaymentState.INITIATED)
+        self.assertEqual(order.status, Order.Status.UNPAID)
+        self.assertEqual(self.item.stock, 9)

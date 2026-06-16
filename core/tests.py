@@ -62,3 +62,69 @@ class RateLimitTests(TestCase):
             self.dummy_view(req)
         except UnboundLocalError:
             self.fail("UnboundLocalError occurred due to shadow import")
+
+from decimal import Decimal
+from core.models import Restaurant, MerchantLedgerBalance, JournalEntry, JournalLine
+from core.ledger import LedgerService, LedgerError
+from ordering.models import Order
+from django.utils import timezone
+
+class TestLedger(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Ledger Test Rest")
+        self.order = Order.objects.create(
+            restaurant=self.restaurant,
+            total=Decimal('100.00'),
+            status=Order.Status.PENDING,
+            created_at=timezone.now()
+        )
+
+    def test_unbalanced_entry_raises_error(self):
+        lines = [
+            {'account_type': JournalLine.AccountType.ASSET_CASH_IN_TRANSIT, 'amount': Decimal('100.00')},
+            {'account_type': JournalLine.AccountType.REVENUE_PLATFORM_FEE, 'amount': Decimal('-10.00')},
+            # Missing -90.00 credit to balance
+        ]
+        with self.assertRaises(LedgerError):
+            LedgerService._create_journal_entry(
+                restaurant=self.restaurant,
+                reference_id="TEST_1",
+                entry_type=JournalEntry.EntryType.MANUAL_ADJUSTMENT,
+                lines=lines
+            )
+
+    def test_payment_capture_creates_balanced_entry(self):
+        LedgerService.record_payment_capture(
+            order=self.order,
+            gross_amount=Decimal('100.00'),
+            fee_amount=Decimal('2.50'),
+            reference_id=f"PAYMENT_{self.order.id}"
+        )
+
+        entry = JournalEntry.objects.get(reference_id=f"PAYMENT_{self.order.id}")
+        lines = entry.lines.all()
+        self.assertEqual(lines.count(), 3)
+        total = sum(l.amount for l in lines)
+        self.assertEqual(total, Decimal('0.00'))
+
+        balance = MerchantLedgerBalance.objects.get(restaurant=self.restaurant)
+        self.assertEqual(balance.available_balance, Decimal('97.50'))
+
+    def test_refund_reverses_balance(self):
+        # Initial capture
+        LedgerService.record_payment_capture(
+            order=self.order,
+            gross_amount=Decimal('100.00'),
+            fee_amount=Decimal('2.50'),
+            reference_id=f"PAYMENT_{self.order.id}"
+        )
+        # Refund
+        LedgerService.record_refund(
+            order=self.order,
+            amount=Decimal('100.00'),
+            fee_refunded=Decimal('2.50')
+        )
+
+        balance = MerchantLedgerBalance.objects.get(restaurant=self.restaurant)
+        self.assertEqual(balance.available_balance, Decimal('0.00'))
+

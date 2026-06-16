@@ -7,7 +7,8 @@ django.setup()
 
 from core.models import Restaurant, Customer, MenuItem, ItemType
 from core.services import create_customer, update_customer_pin, verify_customer_pin, set_customer_status
-from ordering.services import place_post_payment_order, record_customer_payment, CartError
+from ordering.checkout.services import place_post_payment_order, CartError
+from ordering.orders.services import record_customer_payment
 from ordering.models import Order, LedgerEntry
 
 def run_tests():

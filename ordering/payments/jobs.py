@@ -5,12 +5,7 @@ from django.utils import timezone
 
 from ordering.models import PaymentState, PaymentTransaction, WebhookLog
 
-from .services import (
-    PaymentReconciliationService,
-    PaymentRetryService,
-    PaymentVerificationService,
-    WebhookIngestionService,
-)
+from .services import PaymentReconciliationService, PaymentRetryService, PaymentVerificationService, WebhookIngestionService
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +16,29 @@ def _dispatch_or_run(task_func, *args, **kwargs):
     return task_func.delay(*args, **kwargs)
 
 
-@shared_task(bind=True, max_retries=5, default_retry_delay=30)
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def process_payment_webhook_task(self, webhook_log_id):
     try:
         log = WebhookLog.objects.get(pk=webhook_log_id)
+        if log.status == WebhookLog.Status.DEAD_LETTERED:
+            return {"webhook_log_id": str(webhook_log_id), "status": "dead_lettered_skipped"}
         result = WebhookIngestionService().process_log(log)
         return {
             "webhook_log_id": str(result.id),
             "status": "processed",
         }
     except Exception as exc:
-        logger.exception("Webhook processing failed, retrying...")
+        logger.exception("Webhook processing failed.")
+        try:
+            log = WebhookLog.objects.get(pk=webhook_log_id)
+            log.retry_count += 1
+            import traceback
+            log.failed_reason = traceback.format_exc()
+            if self.request.retries >= self.max_retries:
+                log.status = WebhookLog.Status.DEAD_LETTERED
+            log.save(update_fields=['retry_count', 'failed_reason', 'status'])
+        except WebhookLog.DoesNotExist:
+            pass
         raise self.retry(exc=exc)
 
 
@@ -70,8 +77,8 @@ def expire_single_payment_task(self, payment_transaction_id):
         payment.refresh_from_db()
         if payment.state in [PaymentState.PENDING, PaymentState.INITIATED, PaymentState.PROCESSING]:
             if payment.expires_at and payment.expires_at < timezone.now():
-                payment.transition_to(PaymentState.EXPIRED)
-                payment.version += 1
+                from ordering.payments.state_machine import PaymentStateMachine
+                PaymentStateMachine().transition_locked(payment, PaymentState.EXPIRED)
                 payment.save(update_fields=["state", "version", "updated_at"])
                 
                 order = payment.order
@@ -109,12 +116,15 @@ def process_unprocessed_webhooks_task(limit=100):
     processed = 0
     qs = (
         WebhookLog.objects
-        .filter(signature_valid=True, processed_at__isnull=True, retry_count__lt=3)
+        .filter(signature_valid=True, status=WebhookLog.Status.PENDING, retry_count__lt=3)
         .order_by("created_at")[:limit]
     )
     for webhook_log in qs:
         try:
-            WebhookIngestionService().process_log(webhook_log)
+            if getattr(settings, "PAYMENT_JOBS_INLINE", False):
+                process_payment_webhook_task(webhook_log.id)
+            else:
+                process_payment_webhook_task.delay(webhook_log.id)
             processed += 1
         except Exception:
             logger.exception("process_unprocessed_webhook_failed webhook_log=%s", webhook_log.id)

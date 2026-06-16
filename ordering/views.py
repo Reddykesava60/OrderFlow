@@ -18,17 +18,8 @@ from core.ratelimit import client_ip, rate_limit
 from kitchen.models import PaymentEvent
 
 from .models import Order, PaymentProvider, PaymentState, PaymentTransaction
-from .services import (
-    CartError,
-    PaymentConfigurationError,
-    create_razorpay_order,
-    expire_overdue_unpaid_cash_orders,
-    get_restaurant_payment_config,
-    place_cash_order,
-    place_upi_order,
-    place_post_payment_order,
-    get_cash_payment_timeout_minutes,
-)
+from .checkout.services import CartError, PaymentConfigurationError, create_razorpay_order, get_restaurant_payment_config, place_cash_order, place_upi_order, place_post_payment_order
+from .orders.services import expire_overdue_unpaid_cash_orders, get_cash_payment_timeout_minutes
 
 logger = logging.getLogger(__name__)
 POST_PAYMENT_PIN_LIMIT = 5
@@ -538,15 +529,19 @@ class RazorpayVerifyView(View):
             }, status=400)
         except Exception:
             # Network/timeout error fetching from Razorpay.
-            # Graceful fallback: checkout signature was already verified, so we
-            # proceed with confirmation. The reconciliation cron provides the
-            # safety net for edge cases.
+            # Provider truth is required before confirming the order. The
+            # webhook or reconciliation cron will complete this later.
             logger.warning(
                 "payment_verify_fetch_failed rz_order_id=%s rz_payment_id=%s "
                 "— proceeding with checkout signature verification only",
                 rz_order_id, rz_payment_id,
                 exc_info=True,
             )
+            return JsonResponse({
+                'ok': False,
+                'error': 'PAYMENT_VERIFICATION_UNAVAILABLE',
+                'message': 'Payment verification is temporarily unavailable. The payment will be confirmed automatically once the provider status is available.',
+            }, status=202)
 
         # ── Step 3: Confirm the payment ──
         # Find or create a PaymentTransaction for this order so that
@@ -632,6 +627,8 @@ class RazorpayWebhookView(View):
                         webhook_log.id,
                     )
             return HttpResponse(status=200)
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.exception("Razorpay webhook: unified ingestion failed")
             return HttpResponse(status=400)

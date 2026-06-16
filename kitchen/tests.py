@@ -16,7 +16,7 @@ from core.models import (
 )
 from ordering.models import Order
 from ordering.models import OrderItem, OrderItemAddOn, WorkStatus
-from ordering.services import place_cash_order
+from ordering.checkout.services import place_cash_order
 
 
 class CashCollectTimeoutApiTests(TestCase):

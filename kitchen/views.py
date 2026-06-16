@@ -15,12 +15,7 @@ from core.models import StaffFilter
 from core.ratelimit import rate_limit
 from core.timeutils import local_day_bounds
 from ordering.models import Order, OrderItem, OrderItemAddOn, WorkStatus
-from ordering.services import (
-    confirm_cash_payment,
-    expire_overdue_unpaid_cash_orders,
-    get_cash_payment_timeout_minutes,
-    sync_order_status,
-)
+from ordering.orders.services import confirm_cash_payment, expire_overdue_unpaid_cash_orders, get_cash_payment_timeout_minutes, sync_order_status
 from kitchen.services import trigger_kds_refresh
 
 logger = logging.getLogger(__name__)

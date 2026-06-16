@@ -12,19 +12,21 @@ The application implements a normalized schema optimized for data integrity and 
 
 ## Key Table Structures
 
-### Ordering App (`ordering_`)
-- **`ordering_order`**: Core aggregate root for checkout. Tracks `total_amount`, `payment_method`, and `status`. Stores `idempotency_key` explicitly.
-- **`ordering_orderitem` / `ordering_orderitemaddon`**: Stores a static snapshot of the item's name and price at the exact time of order to prevent historical data mutation if a menu item changes.
-- **`ordering_stockreservation`**: Temporary holds on `MenuItem` and `AddOn` stock during checkout processing.
-- **`ordering_paymenttransaction`**: Tracks the external provider's lifecycle. Stores `provider_order_id`, `state`, and references `tenant_config_id`.
-- **`ordering_webhooklog`**: An immutable audit log of every webhook received by the platform, capturing the raw JSON payload and signature validity.
-- **`ordering_ledgerentry`**: The double-entry accounting backbone.
-- **`ordering_settlement`**: Tracks batched payouts to the restaurants.
-
 ### Core App (`core_`)
 - **`core_menuitem`**: Stores definition, metadata, base price, and `stock` count.
 - **`core_addon`**: Global addons linking to menu items.
 - **`core_restaurant`**: Multi-tenant isolation boundary for orders and catalog.
+- **`core_journalentry` / `core_journalline`**: The double-entry accounting backbone. Immutable financial records.
+- **`core_merchantledgerbalance`**: Denormalized aggregate view of a restaurant's total ledger balance.
+- **`core_platformfeerecord`**: Tracks fee accruals owed to the platform.
+- **`core_settlementbatch`**: Tracks batched payouts to the restaurants.
+
+### Ordering App (`ordering_`)
+- **`ordering_order`**: Core aggregate root for checkout. Tracks `total_amount`, `payment_method`, and `status`. Stores `idempotency_key` explicitly.
+- **`ordering_orderitem` / `ordering_orderitemaddon`**: Stores a static snapshot of the item's name and price at the exact time of order to prevent historical data mutation.
+- **`ordering_stockreservation`**: Temporary holds on `MenuItem` and `AddOn` stock during checkout processing.
+- **`ordering_paymenttransaction`**: Tracks the external provider's lifecycle. Stores `provider_order_id`, `state`, and references `tenant_config_id`.
+- **`ordering_webhooklog`**: The webhook ingestion layer. Features strict state tracking (`RECEIVED`, `PROCESSED`, `FAILED`, `DLQ`) for exponential backoff retries.
 
 ### Kitchen App (`kitchen_`)
 - **`kitchen_paymentevent`**: The timeline of a `PaymentTransaction` logging `RAZORPAY_INITIATED`, `WEBHOOK_PROCESSING_STARTED`, `WEBHOOK_PROCESSING_COMPLETED`, and exceptions.

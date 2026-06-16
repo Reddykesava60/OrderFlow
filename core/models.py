@@ -441,6 +441,10 @@ class PlatformFeeRecord(models.Model):
     processing is not active in the current business model.
     All other fields: READ ONLY in application code and Django Admin.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_is_refunded = self.is_refunded
+
     id                = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order             = models.ForeignKey(
         'ordering.Order', on_delete=models.SET_NULL,
@@ -547,23 +551,119 @@ class MonthlyPlatformFeeStatement(models.Model):
 def update_monthly_statement_on_fee_save(sender, instance, created, **kwargs):
     """
     Automatically update or create the MonthlyPlatformFeeStatement when a PlatformFeeRecord is saved.
-    Only handles new records — refund adjustments are not supported in the current business model.
+    Handles new records and explicit False -> True refund transitions.
     """
-    if not created:
-        return
-
     from django.db.models import F
-    
-    # Month start date for grouping
+
     month_start = instance.created_at.date().replace(day=1)
-    
-    # Locate or create the statement for this restaurant and month
     statement, _ = MonthlyPlatformFeeStatement.objects.get_or_create(
         restaurant=instance.restaurant,
         month_date=month_start
     )
-    
-    statement.total_orders_count = F('total_orders_count') + 1
-    statement.total_revenue      = F('total_revenue') + instance.order_total
-    statement.total_fee_amount   = F('total_fee_amount') + instance.fee_amount
-    statement.save(update_fields=['total_orders_count', 'total_revenue', 'total_fee_amount'])
+
+    if created:
+        statement.total_orders_count = F('total_orders_count') + 1
+        statement.total_revenue      = F('total_revenue') + instance.order_total
+        statement.total_fee_amount   = F('total_fee_amount') + instance.fee_amount
+        statement.save(update_fields=['total_orders_count', 'total_revenue', 'total_fee_amount'])
+        instance._original_is_refunded = instance.is_refunded
+    else:
+        # Explicit False -> True transition tracking
+        if not getattr(instance, '_original_is_refunded', False) and instance.is_refunded:
+            statement.total_orders_count = F('total_orders_count') - 1
+            statement.total_revenue      = F('total_revenue') - instance.order_total
+            statement.total_fee_amount   = F('total_fee_amount') - instance.fee_amount
+            statement.save(update_fields=['total_orders_count', 'total_revenue', 'total_fee_amount'])
+            instance._original_is_refunded = True
+
+            from core.ledger import LedgerService
+            LedgerService.record_refund(
+                order=instance.order,
+                amount=instance.order_total,
+                fee_refunded=instance.fee_amount
+            )
+
+# ── Ledger & Settlements ──────────────────────────────────────────────────────
+
+class MerchantLedgerBalance(models.Model):
+    restaurant = models.OneToOneField(Restaurant, on_delete=models.CASCADE, related_name='balance')
+    available_balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    pending_settlement = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.restaurant.name} Balance: {self.available_balance}"
+
+class JournalEntry(models.Model):
+    class EntryType(models.TextChoices):
+        PAYMENT_CAPTURED = 'PAYMENT_CAPTURED', 'Payment Captured'
+        PLATFORM_FEE = 'PLATFORM_FEE', 'Platform Fee'
+        REFUND = 'REFUND', 'Refund'
+        SETTLEMENT = 'SETTLEMENT', 'Settlement'
+        MANUAL_ADJUSTMENT = 'MANUAL_ADJUSTMENT', 'Manual Adjustment'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, null=True, blank=True, related_name='journal_entries')
+    reference_id = models.CharField(max_length=255, help_text='External reference, e.g. Order ID or Settlement ID')
+    entry_type = models.CharField(max_length=50, choices=EntryType.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['restaurant', 'created_at']),
+            models.Index(fields=['reference_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.entry_type} for {self.restaurant} - {self.reference_id}"
+
+class JournalLine(models.Model):
+    class AccountType(models.TextChoices):
+        ASSET_CASH_IN_TRANSIT = 'ASSET_CASH_IN_TRANSIT', 'Asset: Cash in Transit'
+        REVENUE_PLATFORM_FEE = 'REVENUE_PLATFORM_FEE', 'Revenue: Platform Fee'
+        LIABILITY_MERCHANT_BALANCE = 'LIABILITY_MERCHANT_BALANCE', 'Liability: Merchant Balance'
+        LIABILITY_SETTLEMENT_PAYABLE = 'LIABILITY_SETTLEMENT_PAYABLE', 'Liability: Settlement Payable'
+        EXPENSE_REFUND = 'EXPENSE_REFUND', 'Expense: Refund'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines')
+    account_type = models.CharField(max_length=50, choices=AccountType.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, help_text='Positive for Debit, Negative for Credit')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.account_type}: {self.amount}"
+
+class SettlementBatch(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PROCESSED = 'PROCESSED', 'Processed'
+        FAILED = 'FAILED', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Batch {self.id} - {self.status}"
+
+class SettlementRecord(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PAID = 'PAID', 'Paid'
+        FAILED = 'FAILED', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    batch = models.ForeignKey(SettlementBatch, on_delete=models.CASCADE, related_name='records')
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='core_settlements')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    provider_transfer_id = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Settlement {self.id} for {self.restaurant} - {self.amount}"

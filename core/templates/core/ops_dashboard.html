@@ -1,0 +1,82 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Operations Dashboard | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .ops-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .ops-card {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #e5e7eb;
+    }
+    .ops-card h3 {
+        margin-top: 0;
+        font-size: 14px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .ops-card .value {
+        font-size: 32px;
+        font-weight: 600;
+        color: #111827;
+        margin: 10px 0 0 0;
+    }
+    .status-ok { color: #059669; }
+    .status-warn { color: #d97706; }
+    .status-err { color: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Platform Operations Dashboard</h1>
+    <p>Live aggregates across all restaurants and infrastructure.</p>
+
+    <div class="ops-grid">
+        <!-- Financials -->
+        <div class="ops-card">
+            <h3>TGV (Today)</h3>
+            <p class="value">₹{{ tgv }}</p>
+        </div>
+        <div class="ops-card">
+            <h3>Platform Fees (Today)</h3>
+            <p class="value">₹{{ platform_fees }}</p>
+        </div>
+
+        <!-- Reliability -->
+        <div class="ops-card">
+            <h3>Failed Webhooks</h3>
+            <p class="value {% if failed_webhooks > 0 %}status-err{% else %}status-ok{% endif %}">
+                {{ failed_webhooks }}
+            </p>
+        </div>
+        <div class="ops-card">
+            <h3>Dead Letter Queue (DLQ)</h3>
+            <p class="value {% if dlq_size > 0 %}status-warn{% else %}status-ok{% endif %}">
+                {{ dlq_size }}
+            </p>
+        </div>
+
+        <!-- Activity -->
+        <div class="ops-card">
+            <h3>Total Active Restaurants</h3>
+            <p class="value">{{ active_restaurants }}</p>
+        </div>
+        <div class="ops-card">
+            <h3>Online vs Offline</h3>
+            <p class="value status-ok" style="display:inline">{{ online_restaurants }} Online</p> /
+            <p class="value status-warn" style="display:inline">{{ offline_restaurants }} Offline</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

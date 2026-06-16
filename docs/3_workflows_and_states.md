@@ -33,18 +33,17 @@ The primary state machine revolves around the `Order` aggregate in the `ordering
 
 Every transition in the payment lifecycle is immutably tracked via `PaymentEvent` in the `kitchen` app. This provides a clear audit trail for diagnosing stalled or failed payments.
 
-### Dedicated Webhook Processing Lifecycle
-
+3. **Dedicated Webhook Processing Lifecycle**
 The end-to-end webhook processing pipeline flows deterministically:
-**Webhook Received** → **WebhookLog Created** → **Task Enqueued** → **`WEBHOOK_PROCESSING_STARTED`** → **Payment Mutation** → **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`** → **`WEBHOOK_PROCESSING_COMPLETED`**
+**Webhook Received** → **WebhookLog(Status=RECEIVED)** → **Task Enqueued** → **`WEBHOOK_PROCESSING_STARTED`** → **Payment Mutation** → **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`** → **WebhookLog(Status=PROCESSED)** → **`WEBHOOK_PROCESSING_COMPLETED`**
 
 1. **`RAZORPAY_INITIATED` / `DIGITAL_PAYMENT_INITIATED`**: Logged synchronously when the client creates the initial order intent.
 2. **Webhook Receipt**: The `WebhookLog` model acts as an immutable ledger of incoming gateway events. Its fields have specific operational semantics:
+   - `status`: Enum tracking the webhook state (`RECEIVED`, `PROCESSED`, `FAILED`, `DLQ`).
    - `signature_valid`: A boolean indicating if the webhook passed cryptographic verification. Unverified webhooks are ignored by the Celery processor.
    - `provider_event_id`: Used to track and deduplicate the specific event ID sent by the gateway (e.g., preventing double-processing of the exact same Razorpay event).
-   - `processed_at`: Indicates **terminal processing** (either a successful business logic mutation or a permanent exception like `ValueError`). Crucially, this does NOT necessarily indicate a successful payment mutation. If `processed_at` is `NULL`, the `process_unprocessed_webhooks_task` cron job will continually retry the webhook.
    - `failed_reason`: Stores the exception traceback if terminal processing failed due to a business logic violation.
-3. **`WEBHOOK_PROCESSING_STARTED`**: Logged the exact moment the Celery worker (`process_payment_webhook_task` or `process_unprocessed_webhooks_task`) begins processing the `WebhookLog`.
+   - `retry_count` and `next_retry_at`: Controls the exponential backoff logic for background tasks to retry processing up to a maximum number of times before permanently landing in the Dead Letter Queue (DLQ).
 4. **`RAZORPAY_CONFIRMED` / `PAYMENT_FAILED`**: Logged when the database transaction successfully commits the state change.
 5. **`WEBHOOK_PROCESSING_COMPLETED`**: Logged at the very end of processing, after KDS broadcasts have finished.
 6. **Exception Events**: 

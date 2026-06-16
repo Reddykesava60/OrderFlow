@@ -283,20 +283,20 @@ class PaymentTransaction(models.Model):
             models.Index(fields=['expires_at'], name='payment_tra_expires_dd87d6_idx'),
         ]
 
-    def can_transition_to(self, target):
-        return self.state == target or target in PAYMENT_STATE_TRANSITIONS.get(self.state, set())
 
-    def transition_to(self, target):
-        if not self.can_transition_to(target):
-            raise ValueError(f"Invalid payment transition {self.state} -> {target}")
-        self.state = target
 
 
 class WebhookLog(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PROCESSED = 'PROCESSED', 'Processed'
+        DEAD_LETTERED = 'DEAD_LETTERED', 'Dead Lettered'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     restaurant = models.ForeignKey(Restaurant, on_delete=models.SET_NULL, null=True, blank=True, related_name='webhook_logs')
     payment_transaction = models.ForeignKey(PaymentTransaction, on_delete=models.SET_NULL, null=True, blank=True, related_name='webhook_logs')
     provider = models.CharField(max_length=30, choices=PaymentProvider.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     provider_event_id = models.CharField(max_length=160, blank=True)
     idempotency_key = models.CharField(max_length=160, blank=True)
     signature_valid = models.BooleanField(default=False)
@@ -318,6 +318,7 @@ class WebhookLog(models.Model):
             models.Index(fields=['provider', 'idempotency_key'], name='webhook_log_provide_e7b376_idx'),
             models.Index(fields=['provider', 'provider_event_id'], name='webhook_log_provide_c45a37_idx'),
             models.Index(fields=['processed_at'], name='webhook_log_process_ada51a_idx'),
+            models.Index(fields=['status'], name='webhook_log_status_idx'),
         ]
 
 

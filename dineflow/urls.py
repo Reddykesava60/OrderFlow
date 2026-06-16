@@ -4,6 +4,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from core.views_admin import KDSMetricsDashboardView
+from core.views_ops import PlatformOperationsDashboardView
 from . import views
 
 admin.site.site_header = f'{settings.APP_NAME} Platform'
@@ -18,7 +19,9 @@ urlpatterns = [
     path('healthz/ready/', views.health_ready, name='health_ready'),
 
     path('admin/kds-metrics/', KDSMetricsDashboardView.as_view(), name='kds_metrics_dashboard'),
+    path('admin/ops/', PlatformOperationsDashboardView.as_view(), name='ops_dashboard'),
     path('admin/', admin.site.urls),
+    path('', include('django_prometheus.urls')),
 
     # Customer-facing — public, no auth
     path('r/', include('ordering.urls')),

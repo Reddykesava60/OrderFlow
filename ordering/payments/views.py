@@ -6,12 +6,7 @@ from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404
 
 from ordering.models import PaymentTransaction
-from .services import (
-    PaymentOrchestratorService,
-    PaymentRetryService,
-    WebhookIngestionService,
-    verify_payment_access_token,
-)
+from .services import PaymentOrchestratorService, PaymentRetryService, WebhookIngestionService, verify_payment_access_token
 from .jobs import ProcessPaymentWebhookJob
 
 logger = logging.getLogger(__name__)

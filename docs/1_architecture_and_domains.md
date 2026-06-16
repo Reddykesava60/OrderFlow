@@ -11,14 +11,25 @@ The application adopts a standard Django app structure (Model-Template-View) wit
 ## Core Apps
 | App | Responsibility | Interacts With |
 |--------|----------------|----------------|
-| **core** | Identity (Users), Tenants (Restaurants), Catalog (MenuItems, AddOns), Platform Settings | Independent |
-| **ordering** | Sales (Orders, Line Items, Stock Reservations), Payments (Transactions, Webhooks), Finance (Ledger Entries, Settlements) | Core (Pricing/Stock, Tenants) |
+| **core** | Identity (Users), Tenants (Restaurants), Catalog (MenuItems, AddOns), Platform Settings, Double-Entry Ledger (`core.ledger`) | Independent |
+| **ordering** | Sales Checkout, Inventory Reservation, Order State Machine, Payment Webhook DLQ | Core (via Signals) |
 | **kitchen** | Real-time KDS APIs, WebSocket endpoints, Payment Observability (`PaymentEvent`) | Ordering (Order status), Core (Tenants) |
-| **owner** | Dashboard and reporting views for restaurant operators | Core, Ordering |
+| **owner** | Operations dashboards for restaurant managers, decomposed into `views` package (`dashboard`, `auth`, `menu`, `staff`, `settings`, `reports`) | Core, Ordering |
 
-## The Service Layer
-Controllers and views are kept intentionally thin. They map HTTP requests to services located in `services.py` modules within each app.
-These services (e.g., `PaymentMutationService`, `WebhookIngestionService`) encapsulate business rules, orchestration, and database transactions.
+## The Service Layer & Domain Boundaries
+Business logic is strictly decoupled from the views and extracted into discrete service boundaries.
+In `ordering`, this takes the form of:
+- `ordering/checkout/services.py`: Handles cart validation, pricing logic, and initial DB writes.
+- `ordering/inventory/services.py`: Manages finite stock decrements and `StockReservation` locks.
+- `ordering/orders/services.py`: Manages payment confirmations, status synchronization, and expiration handlers.
+
+## Decoupling via Domain Events
+To prevent circular dependencies and tight coupling (e.g. `ordering.checkout` needing to talk directly to `core.ledger` or `ordering.inventory`), the system makes heavy use of **Django Signals as Domain Events**.
+- `order_paid`
+- `order_cancelled`
+- `inventory_released`
+
+When `orders/services.py` confirms a payment, it simply emits `order_paid`. A receiver in `ordering/receivers.py` then safely calls `LedgerService.record_payment_capture()`, keeping the ordering logic ignorant of financial accounting mechanics.
 
 ## Extensibility
-Background processing is handled by Celery workers, and WebSocket traffic is managed by Django Channels with a Redis channel layer. This allows scaling specific application slices by routing WebSocket traffic (e.g., `/api/kitchen`) to specialized ASGI nodes, while Celery workers handle background payment reconciliation.
+Background processing is handled by Celery workers, and WebSocket traffic is managed by Django Channels with a Redis channel layer. This allows scaling specific application slices by routing WebSocket traffic (e.g., `/api/kitchen`) to specialized ASGI nodes, while Celery workers handle background payment reconciliation and Dead Letter Queue retries.

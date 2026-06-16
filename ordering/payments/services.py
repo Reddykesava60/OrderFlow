@@ -24,7 +24,8 @@ from ordering.models import (
     StockReservation,
     WebhookLog,
 )
-from ordering.services import _create_fee_record
+from ordering.orders.services import _create_fee_record
+from ordering.payments.state_machine import PaymentStateMachine
 
 from .contracts import PaymentCreateRequest, PaymentGatewayError, ProviderWebhookEvent
 
@@ -200,8 +201,7 @@ class PaymentOrchestratorService:
             payment.qr_payload = result.qr_payload
             payment.expires_at = result.expires_at or expires_at
             payment.metadata = {"create_response": result.raw_response}
-            payment.transition_to(PaymentState.INITIATED)
-            payment.version += 1
+            PaymentStateMachine().transition_locked(payment, PaymentState.INITIATED)
             payment.save(update_fields=[
                 "provider_order_id", "provider_payment_id", "provider_qr_id",
                 "intent_uri", "qr_image_url", "qr_payload", "expires_at",
@@ -278,8 +278,7 @@ class PaymentVerificationService:
             with transaction.atomic():
                 payment = PaymentTransaction.objects.select_for_update().get(pk=payment.pk)
                 if payment.state == PaymentState.INITIATED:
-                    payment.transition_to(PaymentState.PROCESSING)
-                    payment.version += 1
+                    PaymentStateMachine().transition_locked(payment, PaymentState.PROCESSING)
                     payment.save(update_fields=["state", "version", "updated_at"])
         return payment
 
@@ -292,8 +291,7 @@ class PaymentRetryService:
             payment = PaymentTransaction.objects.select_for_update().select_related("order").get(pk=payment.pk)
             if payment.state in (PaymentState.PAID, PaymentState.REFUNDED):
                 return PaymentOrchestratorService().serialize(payment)
-            payment.transition_to(PaymentState.EXPIRED)
-            payment.version += 1
+            PaymentStateMachine().transition_locked(payment, PaymentState.EXPIRED)
             payment.save(update_fields=["state", "version", "updated_at"])
         return PaymentOrchestratorService().create_payment_for_order(payment.order, provider=payment.provider)
 
@@ -343,7 +341,11 @@ class PaymentMutationService:
                     "order_restaurant_id": str(order.restaurant_id)
                 })
 
-            is_late_capture = (payment.state == PaymentState.FAILED)
+            is_late_capture = (
+                order.payment_method == Order.PaymentMethod.UPI
+                and order.status == Order.Status.CANCELLED
+                and PaymentStateMachine().can_transition(payment.state, PaymentState.PAID)
+            )
             
             if is_late_capture:
                 logger.info("Late capture received for payment %s (Order %s)", payment.id, order.id)
@@ -362,53 +364,53 @@ class PaymentMutationService:
                     razorpay_payment_id=event.provider_payment_id, metadata=metadata
                 )
 
-            StockReservation.objects.select_for_update().filter(order=order, is_confirmed=False).update(is_confirmed=True)
-            now = timezone.now()
-            payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
-            payment.paid_at = now
-            payment.transition_to(PaymentState.PAID)
-            payment.version += 1
-            payment.save(update_fields=["provider_payment_id", "paid_at", "state", "version", "updated_at"])
-
             recovery_failed = False
-            if order.status == Order.Status.UNPAID:
-                order.status = Order.Status.PENDING
-                order.paid_at = now
-                update_fields = ["status", "paid_at"]
-                if payment.provider == PaymentProvider.RAZORPAY:
-                    order.razorpay_payment_id = payment.provider_payment_id
-                    update_fields.append("razorpay_payment_id")
-                order.save(update_fields=update_fields)
-            elif is_late_capture and order.status == Order.Status.CANCELLED:
-                # Deterministic Late-Capture Recovery Workflow
+            if is_late_capture:
                 from core.models import MenuItem, AddOn
                 from django.db import models as db_models
-                
-                # Snapshot stock
+
                 insufficient_stock = False
                 snapshot_meta = {"items": []}
-                for item in order.items.all():
+                for item in order.items.select_related("menu_item").prefetch_related("addons__addon"):
                     if item.menu_item and item.menu_item.stock is not None:
                         current = MenuItem.objects.select_for_update().get(pk=item.menu_item_id).stock
-                        snapshot_meta["items"].append({"menu_item_id": str(item.menu_item_id), "required": item.quantity, "available": current})
+                        snapshot_meta["items"].append({
+                            "menu_item_id": str(item.menu_item_id),
+                            "required": item.quantity,
+                            "available": current,
+                        })
                         if current < item.quantity:
                             insufficient_stock = True
                     for addon in item.addons.all():
                         if addon.addon and addon.addon.stock is not None:
                             current_addon = AddOn.objects.select_for_update().get(pk=addon.addon_id).stock
-                            snapshot_meta["items"].append({"addon_id": str(addon.addon_id), "required": addon.quantity, "available": current_addon})
+                            snapshot_meta["items"].append({
+                                "addon_id": str(addon.addon_id),
+                                "required": addon.quantity,
+                                "available": current_addon,
+                            })
                             if current_addon < addon.quantity:
                                 insufficient_stock = True
-                
+
                 if insufficient_stock:
                     recovery_failed = True
+                    payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
+                    payment.metadata = {
+                        **(payment.metadata or {}),
+                        "manual_recovery_required": True,
+                        "manual_recovery_reason": "late_capture_insufficient_inventory",
+                        "late_capture_snapshot": snapshot_meta,
+                    }
+                    payment.version += 1
+                    payment.save(update_fields=["provider_payment_id", "metadata", "version", "updated_at"])
                     logger.warning("Order %s recovery failed due to insufficient stock", order.id)
                     PaymentEvent.objects.create(
                         event_type=PaymentEvent.EventType.ORDER_RECOVERY_FAILED,
                         event_status=PaymentEvent.EventStatus.FAILED,
                         transaction=payment, order=order, order_ref=order.order_ref_snapshot,
                         restaurant=payment.restaurant, amount=payment.amount,
-                        razorpay_payment_id=event.provider_payment_id, metadata={"snapshot": snapshot_meta, **metadata}
+                        razorpay_payment_id=event.provider_payment_id,
+                        metadata={"snapshot": snapshot_meta, **metadata}
                     )
                     PaymentEvent.objects.create(
                         event_type=PaymentEvent.EventType.PAYMENT_RECOVERY_REQUIRED,
@@ -417,30 +419,60 @@ class PaymentMutationService:
                         restaurant=payment.restaurant, amount=payment.amount,
                         razorpay_payment_id=event.provider_payment_id, metadata=metadata
                     )
-                else:
-                    # Deduct stock
-                    for item in order.items.all():
-                        if item.menu_item and item.menu_item.stock is not None:
-                            MenuItem.objects.filter(pk=item.menu_item_id).update(stock=db_models.F('stock') - item.quantity)
-                        for addon in item.addons.all():
-                            if addon.addon and addon.addon.stock is not None:
-                                AddOn.objects.filter(pk=addon.addon_id).update(stock=db_models.F('stock') - addon.quantity)
-                    
-                    order.status = Order.Status.PENDING
-                    order.paid_at = now
-                    update_fields = ["status", "paid_at"]
-                    if payment.provider == PaymentProvider.RAZORPAY:
-                        order.razorpay_payment_id = payment.provider_payment_id
-                        update_fields.append("razorpay_payment_id")
-                    order.save(update_fields=update_fields)
-                    
-                    PaymentEvent.objects.create(
-                        event_type=PaymentEvent.EventType.ORDER_RECOVERED,
-                        event_status=PaymentEvent.EventStatus.SUCCESS,
-                        transaction=payment, order=order, order_ref=order.order_ref_snapshot,
-                        restaurant=payment.restaurant, amount=payment.amount,
-                        razorpay_payment_id=event.provider_payment_id, metadata=metadata
-                    )
+                    return payment
+
+                for item in order.items.prefetch_related("addons"):
+                    if item.menu_item and item.menu_item.stock is not None:
+                        MenuItem.objects.filter(pk=item.menu_item_id).update(stock=db_models.F('stock') - item.quantity)
+                        StockReservation.objects.create(
+                            order=order,
+                            menu_item=item.menu_item,
+                            quantity=item.quantity,
+                            expires_at=timezone.now(),
+                            is_confirmed=True,
+                        )
+                    for addon in item.addons.all():
+                        if addon.addon and addon.addon.stock is not None:
+                            AddOn.objects.filter(pk=addon.addon_id).update(stock=db_models.F('stock') - addon.quantity)
+                            StockReservation.objects.create(
+                                order=order,
+                                addon=addon.addon,
+                                quantity=addon.quantity,
+                                expires_at=timezone.now(),
+                                is_confirmed=True,
+                            )
+
+                PaymentEvent.objects.create(
+                    event_type=PaymentEvent.EventType.ORDER_RECOVERED,
+                    event_status=PaymentEvent.EventStatus.SUCCESS,
+                    transaction=payment, order=order, order_ref=order.order_ref_snapshot,
+                    restaurant=payment.restaurant, amount=payment.amount,
+                    razorpay_payment_id=event.provider_payment_id, metadata=metadata
+                )
+
+            StockReservation.objects.select_for_update().filter(order=order, is_confirmed=False).update(is_confirmed=True)
+            now = timezone.now()
+            payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
+            payment.paid_at = now
+            PaymentStateMachine().transition_locked(payment, PaymentState.PAID)
+            payment.save(update_fields=["provider_payment_id", "paid_at", "state", "version", "updated_at"])
+
+            if order.status == Order.Status.UNPAID:
+                order.status = Order.Status.PENDING
+                order.paid_at = now
+                update_fields = ["status", "paid_at"]
+                if payment.provider == PaymentProvider.RAZORPAY:
+                    order.razorpay_payment_id = payment.provider_payment_id
+                    update_fields.append("razorpay_payment_id")
+                order.save(update_fields=update_fields)
+            elif is_late_capture:
+                order.status = Order.Status.PENDING
+                order.paid_at = now
+                update_fields = ["status", "paid_at"]
+                if payment.provider == PaymentProvider.RAZORPAY:
+                    order.razorpay_payment_id = payment.provider_payment_id
+                    update_fields.append("razorpay_payment_id")
+                order.save(update_fields=update_fields)
 
             event_type = PaymentEvent.EventType.RAZORPAY_CONFIRMED if payment.provider == PaymentProvider.RAZORPAY else PaymentEvent.EventType.DIGITAL_PAYMENT_CONFIRMED
             initiated_event_type = PaymentEvent.EventType.RAZORPAY_INITIATED if payment.provider == PaymentProvider.RAZORPAY else PaymentEvent.EventType.DIGITAL_PAYMENT_INITIATED
@@ -510,10 +542,31 @@ class PaymentMutationService:
                 logger.info("MARK_FAILED: Payment already paid/refunded")
                 return payment
             payment.provider_payment_id = event.provider_payment_id or payment.provider_payment_id
-            if payment.can_transition_to(PaymentState.FAILED):
-                payment.transition_to(PaymentState.FAILED)
+            if PaymentStateMachine().can_transition(payment.state, PaymentState.FAILED):
+                PaymentStateMachine().transition_locked(payment, PaymentState.FAILED)
+            elif payment.state in (PaymentState.FAILED, PaymentState.EXPIRED):
+                logger.info(
+                    "MARK_FAILED: Ignoring terminal failure transition payment=%s state=%s",
+                    payment.id,
+                    payment.state,
+                )
             else:
-                payment.state = PaymentState.FAILED
+                PaymentEvent.objects.create(
+                    event_type=PaymentEvent.EventType.PAYMENT_STATE_TRANSITION_FAILED,
+                    event_status=PaymentEvent.EventStatus.FAILED,
+                    transaction=payment,
+                    order=payment.order,
+                    order_ref=payment.order.order_ref_snapshot if payment.order else "",
+                    restaurant=payment.restaurant,
+                    amount=payment.amount,
+                    razorpay_payment_id=event.provider_payment_id,
+                    metadata={
+                        **metadata,
+                        "current_state": payment.state,
+                        "target_state": PaymentState.FAILED,
+                    },
+                )
+                return payment
             payment.version += 1
             payment.save(update_fields=["provider_payment_id", "state", "version", "updated_at"])
 
@@ -604,21 +657,6 @@ class WebhookIngestionService:
             )
             return None
 
-        # Duplicate detection by provider event ID
-        if event.provider_event_id:
-            existing_event = WebhookLog.objects.filter(
-                restaurant=payment.restaurant,
-                provider=provider,
-                provider_event_id=event.provider_event_id,
-            ).first()
-            if existing_event:
-                logger.info(
-                    "payment_webhook_duplicate provider=%s event_id=%s "
-                    "payment_id=%s",
-                    provider, event.provider_event_id, payment.id,
-                )
-                return existing_event
-
         # Replay protection
         if not _is_webhook_timestamp_fresh(headers):
             logger.warning(
@@ -644,6 +682,22 @@ class WebhookIngestionService:
                 "payment_id=%s",
                 provider, event.provider_event_id, payment.id,
             )
+
+        # Duplicate detection by provider event ID happens after signature
+        # verification so unsigned duplicate attempts are still rejected.
+        if signature_valid and event.provider_event_id:
+            existing_event = WebhookLog.objects.filter(
+                restaurant=payment.restaurant,
+                provider=provider,
+                provider_event_id=event.provider_event_id,
+            ).first()
+            if existing_event:
+                logger.info(
+                    "payment_webhook_duplicate provider=%s event_id=%s "
+                    "payment_id=%s",
+                    provider, event.provider_event_id, payment.id,
+                )
+                return existing_event
 
         # Persist the webhook log (dedup by payload hash)
         payload_hash = hashlib.sha256(raw_body).hexdigest()
@@ -725,7 +779,8 @@ class WebhookIngestionService:
             logger.info("PROCESS_LOG: Writing processed_at for webhook_log %s", webhook_log.id)
             webhook_log.processed_at = timezone.now()
             webhook_log.failed_reason = ""
-            webhook_log.save(update_fields=["processed_at", "failed_reason"])
+            webhook_log.status = WebhookLog.Status.PROCESSED
+            webhook_log.save(update_fields=["processed_at", "failed_reason", "status"])
             
             PaymentEvent.objects.create(
                 event_type=PaymentEvent.EventType.WEBHOOK_PROCESSING_COMPLETED,
@@ -754,8 +809,12 @@ class WebhookIngestionService:
             webhook_log.failed_reason = str(exc)
             update_fields = ["failed_reason"]
             
-            if is_terminal or webhook_log.retry_count >= 3:
+            next_retry_count = webhook_log.retry_count + 1
+            if is_terminal or next_retry_count >= 3:
                 webhook_log.processed_at = timezone.now()
+                if not is_terminal:
+                    webhook_log.retry_count = next_retry_count
+                    update_fields.append("retry_count")
                 update_fields.append("processed_at")
                 logger.warning(
                     "terminal_webhook_exception provider=%s event_id=%s payment_id=%s exc=%s",
@@ -763,7 +822,7 @@ class WebhookIngestionService:
                     webhook_log.payment_transaction_id, exc
                 )
             else:
-                webhook_log.retry_count += 1
+                webhook_log.retry_count = next_retry_count
                 update_fields.append("retry_count")
                 
             webhook_log.save(update_fields=update_fields)

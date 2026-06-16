@@ -9,7 +9,7 @@ from core.models import Customer
 from core.services import create_customer, update_customer_pin, set_customer_status
 
 from ordering.models import LedgerEntry
-from ordering.services import record_customer_payment
+from ordering.orders.services import record_customer_payment
 from core.mixins import OwnerRequiredMixin
 
 logger = logging.getLogger(__name__)
