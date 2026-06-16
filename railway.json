@@ -6,8 +6,6 @@
   },
   "deploy": {
     "preDeployCommand": "python manage.py migrate --noinput",
-    "healthcheckPath": "/healthz/live/",
-    "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE"
   }
 }
