@@ -24,6 +24,11 @@ class OwnerAuditLogTests(TestCase):
 			allow_order_completion=False,
 		)
 		self.client.force_login(self.owner)
+		from django_otp.plugins.otp_totp.models import TOTPDevice
+		device = TOTPDevice.objects.create(user=self.owner, confirmed=True)
+		session = self.client.session
+		session['otp_device_id'] = device.persistent_id
+		session.save()
 
 	def test_staff_permission_toggle_writes_audit_log(self):
 		response = self.client.post(
@@ -62,3 +67,32 @@ class OwnerAuditLogTests(TestCase):
 		self.assertEqual(log.details['payment_config_after']['account_name'], 'DineFlow Live')
 		self.assertTrue(log.details['payment_config_after']['razorpay_key_secret_present'])
 		self.assertTrue(log.details['payment_config_after']['razorpay_webhook_secret_present'])
+
+
+class OwnerMfaTests(TestCase):
+	def setUp(self):
+		self.restaurant = Restaurant.objects.create(name='MFA Test', slug='mfa-test')
+		self.owner = get_user_model().objects.create_user(
+			username='owner_mfa',
+			password='pass1234',
+			role='OWNER',
+			restaurant=self.restaurant,
+		)
+
+	def test_owner_views_require_mfa_verification(self):
+		self.client.login(username='owner_mfa', password='pass1234')
+		response = self.client.get(reverse('owner:dashboard'))
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.url, reverse('owner:mfa_verify'))
+
+	def test_mfa_setup_view_accessible_without_verification(self):
+		self.client.login(username='owner_mfa', password='pass1234')
+		response = self.client.get(reverse('owner:mfa_setup'))
+		self.assertEqual(response.status_code, 200)
+
+	def test_mfa_verify_view_accessible_without_verification(self):
+		self.client.login(username='owner_mfa', password='pass1234')
+		from django_otp.plugins.otp_totp.models import TOTPDevice
+		TOTPDevice.objects.create(user=self.owner, confirmed=True)
+		response = self.client.get(reverse('owner:mfa_verify'))
+		self.assertEqual(response.status_code, 200)

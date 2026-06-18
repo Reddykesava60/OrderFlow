@@ -1,0 +1,12 @@
+{
+  "name": "dineflow",
+  "version": "1.0.0",
+  "description": "Tailwind build setup",
+  "scripts": {
+    "build:css": "tailwindcss -i ./core/static/css/tailwind.input.css -o ./core/static/css/tailwind.out.css --minify",
+    "watch:css": "tailwindcss -i ./core/static/css/tailwind.input.css -o ./core/static/css/tailwind.out.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.3"
+  }
+}

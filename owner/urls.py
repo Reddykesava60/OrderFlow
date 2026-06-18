@@ -10,6 +10,8 @@ urlpatterns = [
     path('login/', auth.OwnerLoginView.as_view(), name='login'),
     path('logout/', auth.SecureLogoutView.as_view(),                               name='logout'),
     path('change-password/', auth.ChangePasswordView.as_view(), name='change_password'),
+    path('mfa/setup/', auth.MfaSetupView.as_view(), name='mfa_setup'),
+    path('mfa/verify/', auth.MfaVerifyView.as_view(), name='mfa_verify'),
 
     # Dashboard
     path('',                         dashboard.DashboardView.as_view(),       name='dashboard'),

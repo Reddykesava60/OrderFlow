@@ -39,6 +39,7 @@ jobs:
       - name: Production settings check
         env:
           SECRET_KEY: ci-production-check-secret-with-more-than-fifty-characters-1234567890
+          PAYMENT_ENCRYPTION_KEY: ci-payment-encryption-key-distinct-from-secret-key-1234567890
           ALLOWED_HOSTS: example.com,www.example.com
           CSRF_TRUSTED_ORIGINS: https://example.com,https://www.example.com
           REDIS_URL: redis://:ci-redis-password@redis:6379/0

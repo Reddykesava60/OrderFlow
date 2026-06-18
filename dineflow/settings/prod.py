@@ -45,6 +45,15 @@ if not ALLOWED_HOSTS:
 if SECRET_KEY.startswith('django-insecure-') or len(set(SECRET_KEY)) < 20 or len(SECRET_KEY) < 50:
     raise ImproperlyConfigured('Production SECRET_KEY must be strong and must not be committed.')
 
+# Payment data must be encrypted with a key distinct from SECRET_KEY.
+# crypto.py's decrypt_text() falls back to SECRET_KEY for existing data,
+# so this is safe to add — but the key MUST be set before this code deploys.
+if PAYMENT_ENCRYPTION_KEY == SECRET_KEY:
+    raise ImproperlyConfigured(
+        'PAYMENT_ENCRYPTION_KEY must be set to a distinct value in production. '
+        'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))" '
+        'and add it as an environment variable before deploying.'
+    )
 # Optimize DB connections for production load
 DATABASES['default']['CONN_MAX_AGE'] = 60
 
@@ -92,7 +101,7 @@ if SENTRY_DSN:
             RedisIntegration(),
         ],
         traces_sample_rate=config('SENTRY_TRACES_SAMPLE_RATE', default=0.2, cast=float),
-        send_default_pii=True
+        send_default_pii=False
     )
 
 
@@ -106,6 +115,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# CSP defaults to report-only in base.py for dev safety.
+# In production, enforce by default — violations will be blocked, not just reported.
+# Set CONTENT_SECURITY_POLICY_REPORT_ONLY=True in env to temporarily revert during rollout.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = config('CONTENT_SECURITY_POLICY_REPORT_ONLY', default=False, cast=bool)
 CSRF_TRUSTED_ORIGINS = _csv_config('CSRF_TRUSTED_ORIGINS', required=False)
 if config('RAILWAY_PUBLIC_DOMAIN', default=''):
     CSRF_TRUSTED_ORIGINS.append(f"https://{config('RAILWAY_PUBLIC_DOMAIN')}")

@@ -583,7 +583,7 @@ class PaymentMutationService:
                         order=order, is_confirmed=False,
                     )
                 )
-                from ordering.services import _restore_item_availability_after_stock_return
+                from ordering.inventory.services import _restore_item_availability_after_stock_return
                 for res in reservations:
                     if res.menu_item_id and res.menu_item and res.menu_item.stock is not None:
                         from django.db import models as db_models

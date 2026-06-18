@@ -1,14 +1,8 @@
 from django.db import migrations
 
-class Migration(migrations.Migration):
-
-    dependencies = [
-        ('core', '0021_alter_restaurantpaymentconfig_razorpay_key_secret_and_more'),
-    ]
-
-    operations = [
-        migrations.RunSQL(
-            sql="""
+def forward(apps, schema_editor):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute("""
             DO $$
             BEGIN
                 -- Fix A: Disable public access to the migrations table
@@ -19,8 +13,11 @@ class Migration(migrations.Migration):
 
             -- Fix B: Enable RLS
             ALTER TABLE public.django_migrations ENABLE ROW LEVEL SECURITY;
-            """,
-            reverse_sql="""
+        """)
+
+def reverse(apps, schema_editor):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute("""
             ALTER TABLE public.django_migrations DISABLE ROW LEVEL SECURITY;
             DO $$
             BEGIN
@@ -28,6 +25,14 @@ class Migration(migrations.Migration):
             EXCEPTION WHEN OTHERS THEN
                 -- Ignore error
             END $$;
-            """
-        )
+        """)
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('core', '0021_alter_restaurantpaymentconfig_razorpay_key_secret_and_more'),
+    ]
+
+    operations = [
+        migrations.RunPython(forward, reverse)
     ]

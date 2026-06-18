@@ -83,7 +83,7 @@ def expire_single_payment_task(self, payment_transaction_id):
                 
                 order = payment.order
                 if order and order.status == order.Status.UNPAID:
-                    from ordering.services import cancel_upi_payment
+                    from ordering.orders.services import cancel_upi_payment
                     from kitchen.models import PaymentEvent
                     cancel_upi_payment(order, PaymentEvent.EventType.PAYMENT_TIMEOUT)
                 

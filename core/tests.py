@@ -128,3 +128,41 @@ class TestLedger(TestCase):
         balance = MerchantLedgerBalance.objects.get(restaurant=self.restaurant)
         self.assertEqual(balance.available_balance, Decimal('0.00'))
 
+
+from core.templatetags.menu_extras import jsonify
+
+
+class JsonifyFilterTests(TestCase):
+    """Ensure the jsonify template filter escapes HTML-dangerous characters."""
+
+    def test_script_tag_breakout_is_escaped(self):
+        """A value containing </script> must not produce a literal closing tag."""
+        malicious = '</script><script>alert(1)</script>'
+        result = str(jsonify(malicious))
+        self.assertNotIn('</script>', result)
+        self.assertNotIn('<script>', result)
+        # The output must still be valid JSON that decodes to the original value
+        self.assertEqual(json.loads(result), malicious)
+
+    def test_ampersand_is_escaped(self):
+        result = str(jsonify('a&b'))
+        self.assertNotIn('&', result)
+        self.assertEqual(json.loads(result), 'a&b')
+
+    def test_angle_brackets_are_escaped(self):
+        result = str(jsonify('<b>bold</b>'))
+        self.assertNotIn('<', result)
+        self.assertNotIn('>', result)
+        self.assertEqual(json.loads(result), '<b>bold</b>')
+
+    def test_normal_string_round_trips(self):
+        value = "Chicken Biryani (Large)"
+        result = str(jsonify(value))
+        self.assertEqual(json.loads(result), value)
+
+    def test_dict_with_special_chars(self):
+        value = {'name': 'Tom & Jerry <Special>', 'price': 100}
+        result = str(jsonify(value))
+        self.assertNotIn('&', result)
+        self.assertNotIn('<', result)
+        self.assertEqual(json.loads(result), value)

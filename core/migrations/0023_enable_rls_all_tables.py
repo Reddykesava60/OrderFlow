@@ -54,6 +54,14 @@ END $$;
 """
 
 
+def forward(apps, schema_editor):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute(ENABLE_RLS_SQL)
+
+def reverse(apps, schema_editor):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute(DISABLE_RLS_SQL)
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -61,8 +69,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql=ENABLE_RLS_SQL,
-            reverse_sql=DISABLE_RLS_SQL,
-        ),
+        migrations.RunPython(forward, reverse)
     ]

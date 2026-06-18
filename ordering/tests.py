@@ -418,7 +418,7 @@ class TestUpiPaymentRecovery(TestCase):
         mock_client.order.create.return_value = {'id': 'order_test_recovery_123'}
 
         # 1 & 2 & 3: Place UPI order and create razorpay order (which now creates PaymentTransaction)
-        from ordering.services import create_razorpay_order
+        from ordering.checkout.services import create_razorpay_order
         
         order = place_upi_order(
             self.restaurant,

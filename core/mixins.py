@@ -50,11 +50,18 @@ class OrderCompletionMixin(ActiveStaffMixin):
 
 
 class OwnerRequiredMixin(ActiveStaffMixin):
-    """role=OWNER only."""
+    """role=OWNER only. Enforces MFA verification."""
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
         if hasattr(response, 'status_code') and response.status_code in (302, 403):
             return response
         if not self.request.user.is_owner:
             return HttpResponseForbidden("Owner access required.")
+            
+        from django.urls import reverse
+        exempt_paths = [reverse('owner:mfa_setup'), reverse('owner:mfa_verify'), reverse('owner:logout')]
+        if request.path not in exempt_paths:
+            if not request.user.is_verified():
+                return redirect('owner:mfa_verify')
+                
         return response
