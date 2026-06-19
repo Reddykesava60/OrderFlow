@@ -45,3 +45,10 @@ STORAGES = {
         'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
     },
 }
+
+# Razorpay — placeholder values for the test suite.
+# These are never sent to Razorpay; they prevent credential-guard
+# exceptions when payment service classes are instantiated in tests.
+RAZORPAY_KEY_ID     = 'test-key-id-not-real'
+RAZORPAY_KEY_SECRET = 'test-key-secret-not-real'
+RAZORPAY_WEBHOOK_SECRET = 'test-webhook-secret-not-real'

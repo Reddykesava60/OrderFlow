@@ -1,32 +1,31 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    './**/*.html',
-    './**/*.py',
+    './core/**/*.html',
+    './core/**/*.py',
+    './owner/**/*.html',
+    './owner/**/*.py',
+    './ordering/**/*.html',
+    './ordering/**/*.py',
+    './kitchen/**/*.html',
+    './kitchen/**/*.py',
   ],
   theme: {
     extend: {
       colors: {
         brand: {
-          50: '#fef2f2',
-          100: '#fee2e2',
-          200: '#fecaca',
-          300: '#fca5a5',
-          400: '#f87171',
-          500: '#ef4444',
-          600: '#dc2626',
-          700: '#b91c1c',
-          800: '#991b1b',
-          900: '#7f1d1d',
-          950: '#450a0a',
+          50:  '#f0f7ff',
+          100: '#e0effe',
+          200: '#bae0fd',
+          300: '#7cc8fb',
+          400: '#36abf7',
+          500: '#0c91eb',
+          600: '#0071c9',
+          700: '#005aa3',
+          800: '#1a3c5e',
+          900: '#0a233d',
         },
-        accent: {
-          50: '#fffbeb',
-          100: '#fef3c7',
-          500: '#f59e0b',
-          600: '#d97706',
-          900: '#78350f',
-        }
+        accent: '#e85d20',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

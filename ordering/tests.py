@@ -179,7 +179,7 @@ class TestUpiWebhook(TestCase):
             stock=10,
         )
         payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'rzp_test_example123456'
+        payment_config.razorpay_key_id = 'test_key_example123456'
         payment_config.razorpay_key_secret = 'test_secret_123'
         payment_config.razorpay_webhook_secret = 'whsec_test_123'
         payment_config.is_active = True
@@ -404,7 +404,7 @@ class TestUpiPaymentRecovery(TestCase):
             stock=10,
         )
         payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'rzp_test_example123456'
+        payment_config.razorpay_key_id = 'test_key_example123456'
         payment_config.razorpay_key_secret = 'test_secret_123'
         payment_config.razorpay_webhook_secret = 'whsec_test_123'
         payment_config.is_active = True
@@ -557,7 +557,7 @@ class TestUpiPaymentStateIntegrity(TestCase):
             stock=10,
         )
         payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'rzp_test_integrity123'
+        payment_config.razorpay_key_id = 'test_key_integrity123'
         payment_config.razorpay_key_secret = 'test_secret_123'
         payment_config.razorpay_webhook_secret = 'whsec_test_123'
         payment_config.is_active = True

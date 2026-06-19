@@ -7,7 +7,6 @@
   <title>{{ restaurant.name }}</title>
   
   <!-- Tailwind & Fonts -->
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,31 +16,7 @@
   
   {% load static %}
   {% load menu_extras %}
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-          colors: {
-            brand: {
-              50: '#f0f7ff',
-              100: '#e0effe',
-              200: '#bae0fd',
-              300: '#7cc8fb',
-              400: '#36abf7',
-              500: '#0c91eb',
-              600: '#0071c9',
-              700: '#005aa3',
-              800: '#1a3c5e',
-              900: '#0a233d',
-            },
-            accent: '#e85d20',
-          }
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="{% static 'css/tailwind.out.css' %}">
 
   <style>
     [x-cloak] { display: none !important; }

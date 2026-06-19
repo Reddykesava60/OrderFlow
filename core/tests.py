@@ -74,6 +74,7 @@ class TestLedger(TestCase):
         self.restaurant = Restaurant.objects.create(name="Ledger Test Rest")
         self.order = Order.objects.create(
             restaurant=self.restaurant,
+            order_number=1,
             total=Decimal('100.00'),
             status=Order.Status.PENDING,
             created_at=timezone.now()
