@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from core.views_admin import KDSMetricsDashboardView
 from core.views_ops import PlatformOperationsDashboardView
+from ordering.views import RazorpayWebhookView
 from . import views
 
 admin.site.site_header = f'{settings.APP_NAME} Platform'
@@ -13,7 +14,11 @@ admin.site.index_title = 'Platform management'
 
 handler404 = 'dineflow.views.custom_404'
 
+def trigger_error(request):
+    division_by_zero = 1 / 0
+
 urlpatterns = [
+    path('sentry-debug/', trigger_error),
     path('', views.landing, name='landing'),
     path('healthz/live/', views.health_live, name='health_live'),
     path('healthz/ready/', views.health_ready, name='health_ready'),
@@ -28,6 +33,9 @@ urlpatterns = [
 
     # Razorpay webhook — public endpoint, HMAC-secured
     path('payments/', include('ordering.urls_payments')),
+    
+    # Fallback alias for old Razorpay webhook URL to prevent lost webhooks
+    path('order/razorpay/webhook/', RazorpayWebhookView.as_view()),
 
     # KDS + staff API — session auth
     path('api/', include('kitchen.urls', namespace='kitchen')),
