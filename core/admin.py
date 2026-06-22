@@ -162,12 +162,13 @@ class UserAdmin(BaseUserAdmin):
         'allow_view_all_orders',
         'is_active',
         'must_change_password',
+        'mfa_enabled',
         'last_login',
     ]
-    list_filter    = ['role', 'restaurant', 'allow_view_all_orders', 'is_active', 'must_change_password']
+    list_filter    = ['role', 'restaurant', 'allow_view_all_orders', 'is_active', 'must_change_password', 'mfa_enabled']
     search_fields  = ['username', 'first_name', 'last_name']
     readonly_fields = ['last_login', 'date_joined', 'id']
-    actions        = ['force_password_reset', 'deactivate_users', 'activate_users']
+    actions        = ['force_password_reset', 'deactivate_users', 'activate_users', 'enable_mfa_for_users', 'disable_mfa_for_users']
 
     fieldsets = BaseUserAdmin.fieldsets + (
         (settings.APP_NAME, {
@@ -178,6 +179,7 @@ class UserAdmin(BaseUserAdmin):
                 'allow_view_all_orders',
                 'allow_order_completion',
                 'must_change_password',
+                'mfa_enabled',
                 'photo',
             )
         }),
@@ -191,6 +193,7 @@ class UserAdmin(BaseUserAdmin):
                 'allow_view_all_orders',
                 'allow_order_completion',
                 'must_change_password',
+                'mfa_enabled',
             )
         }),
     )
@@ -209,6 +212,16 @@ class UserAdmin(BaseUserAdmin):
     def activate_users(self, request, queryset):
         updated = queryset.update(is_active=True)
         self.message_user(request, f"{updated} user(s) activated.")
+
+    @admin.action(description='Require 2FA for selected users')
+    def enable_mfa_for_users(self, request, queryset):
+        updated = queryset.update(mfa_enabled=True)
+        self.message_user(request, f"{updated} user(s) flagged to require 2FA.")
+
+    @admin.action(description='Disable 2FA for selected users')
+    def disable_mfa_for_users(self, request, queryset):
+        updated = queryset.update(mfa_enabled=False)
+        self.message_user(request, f"{updated} user(s) had 2FA requirement disabled.")
 
 
 # ── PlatformFeeRecord Admin ───────────────────────────────────────────────────
@@ -421,3 +434,30 @@ class SettlementRecordAdmin(admin.ModelAdmin):
     list_filter = ('status', 'created_at')
     search_fields = ('restaurant__name', 'batch__id')
     readonly_fields = ('id', 'restaurant', 'batch', 'amount', 'status', 'provider_transfer_id', 'created_at', 'updated_at')
+
+# ── Platform Admin MFA Patch ──────────────────────────────────────────────────
+
+from django_otp.admin import OTPAdminAuthenticationForm
+from django.core.exceptions import ValidationError
+
+class PlatformAdminAuthForm(OTPAdminAuthenticationForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        user = self.get_user()
+        if user and getattr(user, 'mfa_enabled', False) and not user.is_verified():
+            raise ValidationError("Two-Factor Authentication is required. Please provide a valid OTP token.")
+        return cleaned_data
+
+admin.site.login_form = PlatformAdminAuthForm
+
+original_has_permission = admin.site.has_permission
+
+def custom_has_permission(request):
+    has_perm = original_has_permission(request)
+    if not has_perm:
+        return False
+    if getattr(request.user, 'mfa_enabled', False):
+        return request.user.is_verified()
+    return True
+
+admin.site.has_permission = custom_has_permission

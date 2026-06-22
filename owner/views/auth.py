@@ -89,6 +89,8 @@ class ChangePasswordView(View):
 
 class MfaSetupView(OwnerRequiredMixin, View):
     def get(self, request):
+        if not request.user.mfa_enabled:
+            return redirect('owner:dashboard')
         if request.user.is_verified():
             return redirect('owner:dashboard')
         
@@ -103,6 +105,8 @@ class MfaSetupView(OwnerRequiredMixin, View):
         return render(request, 'owner/mfa_setup.html', {'qr_code': qr_b64, 'secret': device.key})
 
     def post(self, request):
+        if not request.user.mfa_enabled:
+            return redirect('owner:dashboard')
         if request.user.is_verified():
             return redirect('owner:dashboard')
             
@@ -125,6 +129,8 @@ class MfaSetupView(OwnerRequiredMixin, View):
 
 class MfaVerifyView(OwnerRequiredMixin, View):
     def get(self, request):
+        if not request.user.mfa_enabled:
+            return redirect('owner:dashboard')
         if request.user.is_verified():
             return redirect('owner:dashboard')
         device = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
@@ -133,6 +139,8 @@ class MfaVerifyView(OwnerRequiredMixin, View):
         return render(request, 'owner/mfa_verify.html')
         
     def post(self, request):
+        if not request.user.mfa_enabled:
+            return redirect('owner:dashboard')
         if request.user.is_verified():
             return redirect('owner:dashboard')
         token = request.POST.get('token', '').strip()

@@ -50,7 +50,7 @@ class OrderCompletionMixin(ActiveStaffMixin):
 
 
 class OwnerRequiredMixin(ActiveStaffMixin):
-    """role=OWNER only. Enforces MFA verification."""
+    """role=OWNER only. Enforces MFA verification if mfa_enabled is True."""
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
         if hasattr(response, 'status_code') and response.status_code in (302, 403):
@@ -61,7 +61,7 @@ class OwnerRequiredMixin(ActiveStaffMixin):
         from django.urls import reverse
         exempt_paths = [reverse('owner:mfa_setup'), reverse('owner:mfa_verify'), reverse('owner:logout')]
         if request.path not in exempt_paths:
-            if not request.user.is_verified():
+            if request.user.mfa_enabled and not request.user.is_verified():
                 return redirect('owner:mfa_verify')
                 
         return response
