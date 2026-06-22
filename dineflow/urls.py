@@ -14,11 +14,7 @@ admin.site.index_title = 'Platform management'
 
 handler404 = 'dineflow.views.custom_404'
 
-def trigger_error(request):
-    division_by_zero = 1 / 0
-
 urlpatterns = [
-    path('sentry-debug/', trigger_error),
     path('', views.landing, name='landing'),
     path('healthz/live/', views.health_live, name='health_live'),
     path('healthz/ready/', views.health_ready, name='health_ready'),
@@ -26,7 +22,6 @@ urlpatterns = [
     path('admin/kds-metrics/', KDSMetricsDashboardView.as_view(), name='kds_metrics_dashboard'),
     path('admin/ops/', PlatformOperationsDashboardView.as_view(), name='ops_dashboard'),
     path('admin/', admin.site.urls),
-    path('', include('django_prometheus.urls')),
 
     # Customer-facing — public, no auth
     path('r/', include('ordering.urls')),

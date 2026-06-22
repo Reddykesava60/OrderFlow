@@ -74,6 +74,7 @@ def _clear_post_payment_pin_failures(request, restaurant, serial_number):
         logger.exception("Post-payment PIN rate limiter cleanup failed")
 
 
+@method_decorator(rate_limit('menu', limit=60, window=60), name='dispatch')
 class MenuView(View):
     """
     GET /r/{slug}/

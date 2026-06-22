@@ -1,59 +1,51 @@
-# Dineflow: Production Restaurant Operating System
+# Dineflow
 
-Dineflow is a robust, production-grade restaurant operating system built with Django. It manages multi-tenant restaurant configurations, ordering and checkout flows, inventory tracking, financial double-entry ledger bookkeeping, and real-time Kitchen Display Systems (KDS).
+Dineflow is a multi-tenant restaurant operating system: customers order and
+pay from their phone via a QR code, kitchens see tickets in real time, and
+every payment is tracked through an immutable financial ledger.
 
-## Core Technologies
-- **Backend**: Django 5.x
-- **Database**: PostgreSQL (Production) / SQLite (Local Dev)
-- **Real-Time**: Django Channels & Redis (for KDS WebSockets)
-- **Background Tasks**: Celery & Redis
-- **Payment Processing**: Razorpay
+**Start here → [`docs/README.md`](./docs/README.md)** — documentation is
+organized by audience (non-technical overview, engineering, operations),
+not dumped into one file.
 
-## Architectural Domains
+## At a glance
 
-The application is heavily modularized to maintain strict domain boundaries:
+- **Backend**: Django 5.2
+- **Database**: PostgreSQL in production (Supabase-hosted), SQLite for
+  local development
+- **Real-time**: Django Channels + Redis (Kitchen Display System
+  WebSockets)
+- **Background jobs**: Celery + Redis
+- **Payments**: Razorpay, with a multi-provider abstraction in place
+- **File storage**: Supabase Storage (S3-compatible)
 
-1. **`core` App**: 
-   - Handles multi-tenant identity (`Restaurant`), Users, and global catalogs (`MenuItem`, `AddOn`).
-   - Contains the **Double-Entry Financial Ledger** (`core/ledger.py`) acting as the ultimate source of truth for restaurant payouts and platform fees.
-2. **`ordering` App**: 
-   - **Checkout** (`ordering/checkout/services.py`): Cart validation, pricing, and initial order creation.
-   - **Inventory** (`ordering/inventory/services.py`): Stock reservation locks, decrementing, and auto-availability toggles.
-   - **Orders** (`ordering/orders/services.py`): Webhook validations, payment captures, state machine transitions, and expirations.
-   - **Payments** (`ordering/payments/`): Webhook ingest, signature validation, and the Dead Letter Queue (DLQ).
-3. **`owner` App**: 
-   - Operations dashboards for restaurant managers, decomposed into `dashboard`, `auth`, `menu`, `staff`, `settings`, and `reports` views.
-4. **`kitchen` App**:
-   - Real-time Kitchen Display System (KDS) powered by Django Channels and React/Alpine.js.
+## Quick local setup
 
-## Immutable Data and Auditing
-The system enforces strict immutability for critical paths:
-- Financial records are tracked via append-only `JournalEntry` and `JournalLine` models.
-- Payment lifecycles are tracked via `PaymentEvent`.
-- Webhooks are stored completely in `WebhookLog` before processing, allowing deterministic replays of failed payloads.
-- Staff actions (menu changes, refunds) are tracked in `OwnerAuditLog`.
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # set SECRET_KEY and DATABASE_URL at minimum
+python manage.py migrate
+python manage.py runserver
+```
 
-## Local Setup
+See
+[`docs/engineering/11-local-development-setup.md`](./docs/engineering/11-local-development-setup.md)
+for the full setup (including Celery, Redis, and Docker Compose options),
+and
+[`docs/operations/01-deployment-guide.md`](./docs/operations/01-deployment-guide.md)
+for deploying this to production.
 
-1. **Environment Setup**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **Configuration**:
-   Copy `.env.example` to `.env` and fill in necessary Redis/Postgres/Razorpay keys.
-3. **Database**:
-   ```bash
-   python manage.py migrate
-   ```
-4. **Run Server**:
-   ```bash
-   python manage.py runserver
-   ```
-5. **Run Workers** (requires Redis):
-   ```bash
-   celery -A dineflow worker -l info
-   ```
+## Where the four Django apps fit
 
-For detailed internal documentation, see the `/docs/` directory.
+| App | Owns |
+|---|---|
+| `core` | Tenants (`Restaurant`), users, the menu catalog, and the platform-wide financial records |
+| `ordering` | Checkout, inventory locking, the order state machine, and the full payment/webhook pipeline |
+| `kitchen` | The Kitchen Display System — REST + WebSocket |
+| `owner` | Restaurant manager dashboards |
+
+See [`docs/engineering/01-architecture-overview.md`](./docs/engineering/01-architecture-overview.md)
+for why the boundaries are drawn where they are, and
+[`docs/engineering/02-codebase-map.md`](./docs/engineering/02-codebase-map.md)
+for the full directory-by-directory breakdown.
