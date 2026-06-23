@@ -449,7 +449,7 @@ class PlatformAdminAuthForm(OTPAdminAuthenticationForm):
         return cleaned_data
 
 admin.site.login_form = PlatformAdminAuthForm
-admin.site.login_template = 'otp/admin/login.html'
+admin.site.login_template = 'otp/admin111/login.html'
 
 original_has_permission = admin.site.has_permission
 
