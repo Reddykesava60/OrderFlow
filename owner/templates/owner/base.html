@@ -205,6 +205,23 @@
       });
     });
 
+    // Handle logout forms specifically
+    document.querySelectorAll('form[action="{% url \'owner:logout\' %}"]').forEach(form => {
+      form.addEventListener('submit', (e) => {
+        if (isNavigating) {
+          e.preventDefault();
+          return;
+        }
+        isNavigating = true;
+        
+        loader.style.display = 'flex';
+        requestAnimationFrame(() => {
+          loader.classList.remove('opacity-0', 'pointer-events-none');
+          loader.classList.add('opacity-100');
+        });
+      });
+    });
+
     // Handle browser back/forward buttons & ensure loader hides
     window.addEventListener('pageshow', (e) => {
       if (e.persisted || isNavigating) {
