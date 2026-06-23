@@ -442,7 +442,9 @@ from django.core.exceptions import ValidationError
 
 class PlatformAdminAuthForm(OTPAdminAuthenticationForm):
     def clean(self):
-        cleaned_data = super().clean()
+        # Skip OTPAdminAuthenticationForm's clean which strictly requires verification for all,
+        # and instead call the mixin's clean to just verify the token if one is provided.
+        cleaned_data = super(OTPAdminAuthenticationForm, self).clean()
         user = self.get_user()
         if user and getattr(user, 'mfa_enabled', False) and not user.is_verified():
             raise ValidationError("Two-Factor Authentication is required. Please provide a valid OTP token.")
