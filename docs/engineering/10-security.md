@@ -12,10 +12,11 @@ paper than it is in practice.
   Usernames are unique **per restaurant**, case-insensitively (a database
   constraint, not just application-level validation), so two different
   restaurants can each have a `manager` account without collision.
-- **Owners can enable TOTP-based MFA** (`django-otp` +
-  `otp_totp.TOTPDevice`) — a standard authenticator-app second factor,
-  set up via `/owner/mfa/setup/` and required on subsequent logins once
-  confirmed.
+- **Owners and Admins can enable TOTP-based MFA** (`django-otp` +
+  `otp_totp.TOTPDevice`) — a standard authenticator-app second factor.
+  It is set up via `/owner/mfa/setup/` (or `/admin/mfa/setup/` for platform admins) 
+  and required on subsequent logins once confirmed. The authentication 
+  happens in a dedicated 2-step verification flow after standard username/password login.
 - **Customers** (for the post-payment/tab feature) authenticate with a
   restaurant-scoped serial number + PIN, not a password. PINs are hashed
   with a dedicated hasher (`core.hashers.CustomerPINHasher`, PBKDF2 with

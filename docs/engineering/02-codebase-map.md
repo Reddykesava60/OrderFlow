@@ -44,7 +44,7 @@ docs/               You are here
 | `ratelimit.py` | Rate-limiting decorator used on sensitive endpoints |
 | `storage.py` | Supabase Storage integration for images |
 | `services.py` | Small cross-cutting helpers that don't belong to a specific domain |
-| `views_admin.py`, `views_ops.py` | The `/admin/kds-metrics/` and `/admin/ops/` internal dashboards |
+| `views_admin.py`, `views_ops.py`, `views_admin_mfa.py` | The `/admin/kds-metrics/` and `/admin/ops/` internal dashboards, plus the Admin MFA setup/verify flow |
 | `management/commands/sync_monthly_statements.py` | CLI entry point for the same job Celery Beat runs hourly |
 
 ## `ordering/` — the busiest app, split into sub-packages
