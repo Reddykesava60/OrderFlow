@@ -27,7 +27,6 @@ INSTALLED_APPS = [
     'django_prometheus',
     'django_otp',
     'django_otp.plugins.otp_totp',
-    'django_otp.plugins.otp_admin',
     # our apps
     'core',
     'ordering',
