@@ -51,3 +51,25 @@ class MustChangePasswordMiddleware:
                 return redirect("owner:change_password")
 
         return self.get_response(request)
+
+
+class AdminMfaMiddleware:
+    """
+    Forces staff/admin users with mfa_enabled=True to complete the 2FA verification
+    step before they can access any /admin/ pages.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        path = request.path
+        if path.startswith('/admin/') and request.user.is_authenticated and request.user.is_staff:
+            exempt_paths = [
+                reverse('admin_mfa_setup'),
+                reverse('admin_mfa_verify'),
+                reverse('admin:logout'),
+            ]
+            if path not in exempt_paths:
+                if getattr(request.user, 'mfa_enabled', False) and not request.user.is_verified():
+                    return redirect('admin_mfa_verify')
+        return self.get_response(request)

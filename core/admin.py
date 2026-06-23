@@ -435,32 +435,4 @@ class SettlementRecordAdmin(admin.ModelAdmin):
     search_fields = ('restaurant__name', 'batch__id')
     readonly_fields = ('id', 'restaurant', 'batch', 'amount', 'status', 'provider_transfer_id', 'created_at', 'updated_at')
 
-# ── Platform Admin MFA Patch ──────────────────────────────────────────────────
 
-from django_otp.admin import OTPAdminAuthenticationForm
-from django.core.exceptions import ValidationError
-
-class PlatformAdminAuthForm(OTPAdminAuthenticationForm):
-    def clean(self):
-        # Skip OTPAdminAuthenticationForm's clean which strictly requires verification for all,
-        # and instead call the mixin's clean to just verify the token if one is provided.
-        cleaned_data = super(OTPAdminAuthenticationForm, self).clean()
-        user = self.get_user()
-        if user and getattr(user, 'mfa_enabled', False) and not user.is_verified():
-            raise ValidationError("Two-Factor Authentication is required. Please provide a valid OTP token.")
-        return cleaned_data
-
-admin.site.login_form = PlatformAdminAuthForm
-admin.site.login_template = 'otp/admin111/login.html'
-
-original_has_permission = admin.site.has_permission
-
-def custom_has_permission(request):
-    has_perm = original_has_permission(request)
-    if not has_perm:
-        return False
-    if getattr(request.user, 'mfa_enabled', False):
-        return request.user.is_verified()
-    return True
-
-admin.site.has_permission = custom_has_permission

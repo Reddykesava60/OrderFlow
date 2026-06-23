@@ -7,6 +7,7 @@ from core.views_admin import KDSMetricsDashboardView
 from core.views_ops import PlatformOperationsDashboardView
 from ordering.views import RazorpayWebhookView
 from . import views
+import core.views_admin_mfa
 
 admin.site.site_header = f'{settings.APP_NAME} Platform'
 admin.site.site_title  = f'{settings.APP_NAME} Admin'
@@ -21,6 +22,10 @@ urlpatterns = [
 
     path('admin/kds-metrics/', KDSMetricsDashboardView.as_view(), name='kds_metrics_dashboard'),
     path('admin/ops/', PlatformOperationsDashboardView.as_view(), name='ops_dashboard'),
+    
+    path('admin/mfa/setup/', core.views_admin_mfa.AdminMfaSetupView.as_view(), name='admin_mfa_setup'),
+    path('admin/mfa/verify/', core.views_admin_mfa.AdminMfaVerifyView.as_view(), name='admin_mfa_verify'),
+    
     path('admin/', admin.site.urls),
 
     # Customer-facing — public, no auth
