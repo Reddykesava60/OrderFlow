@@ -13,6 +13,7 @@ involving Celery, Redis, or Nginx specifically).
 python -m venv .venv
 source .venv/bin/activate        # .venv\Scripts\activate on Windows
 pip install -r requirements.txt
+ python manage.py runserver --settings=dineflow.settings.dev
 ```
 
 ### 2. Environment variables

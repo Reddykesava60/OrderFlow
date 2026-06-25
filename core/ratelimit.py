@@ -4,6 +4,7 @@ import logging
 
 from django.core.cache import cache
 from django.http import JsonResponse
+from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +52,17 @@ def rate_limit(name, *, limit, window, key_func=None):
                 except ValueError:
                     cache.set("kds_metrics_rate_limit_hits", 1, timeout=None)
                 
-                response = JsonResponse(
-                    {
-                        "error": "RATE_LIMITED",
-                        "message": "Too many requests. Please try again shortly.",
-                    },
-                    status=429,
-                )
+                accepts = request.META.get('HTTP_ACCEPT', '')
+                if 'text/html' in accepts:
+                    response = render(request, '429.html', status=429)
+                else:
+                    response = JsonResponse(
+                        {
+                            "error": "RATE_LIMITED",
+                            "message": "Too many requests. Please try again shortly.",
+                        },
+                        status=429,
+                    )
                 response["Retry-After"] = str(window)
                 return response
 

@@ -27,3 +27,7 @@ services:
   nginx:
     profiles:
       - production
+
+  certbot:
+    profiles:
+      - production

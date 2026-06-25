@@ -206,7 +206,7 @@
     });
 
     // Handle logout forms specifically
-    document.querySelectorAll('form[action="{% url \'owner:logout\' %}"]').forEach(form => {
+    document.querySelectorAll(`form[action="{% url 'owner:logout' %}"]`).forEach(form => {
       form.addEventListener('submit', (e) => {
         if (isNavigating) {
           e.preventDefault();

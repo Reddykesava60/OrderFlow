@@ -333,7 +333,7 @@
           <span class="brand-icon">{{ APP_SHORT_NAME }}</span>
           <span class="brand-name">{{ APP_NAME }}</span>
         </a>
-        <a href="{% url 'owner:dashboard' %}" class="header-login" id="header-login-btn">Owner Login</a>
+        <a href="{% url 'owner:login' %}" class="header-login" id="header-login-btn">Sign In</a>
       </div>
     </header>
 
@@ -345,8 +345,8 @@
         <p class="hero-subtitle">
           QR menus, kitchen display, payments, and owner controls — everything your restaurant needs in one clean workflow.
         </p>
-        <a href="{% url 'owner:dashboard' %}" class="hero-cta" id="hero-cta-btn">
-          Open Dashboard
+        <a href="{% url 'owner:login' %}" class="hero-cta" id="hero-cta-btn">
+          Sign In
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14M12 5l7 7-7 7"/>
           </svg>

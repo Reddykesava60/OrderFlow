@@ -108,6 +108,11 @@ Two details worth knowing: the limiter **fails open** — if the cache
 itself is unreachable, the request is allowed through rather than blocking
 legitimate traffic because of an infrastructure problem — and exceeding a
 limit returns `429` with a `Retry-After` header set to the window length.
+For API requests, the response is JSON. For browser requests, it renders
+the `429.html` template.
+
+*(Note: Standard HTTP errors like 400, 403, 404, and 500 are also handled globally via dedicated, branded HTML templates in the `templates/` directory when `DEBUG=False`.)*
+
 Post-payment PIN attempts have their own separate, customer-specific
 lockout logic in `ordering/views.py`, layered on top of the general
 checkout rate limit.
