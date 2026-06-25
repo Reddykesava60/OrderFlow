@@ -189,11 +189,28 @@ class RazorpayProvider(BaseProvider):
         entity = payload.get("payload", {})
         payment = entity.get("payment", {}).get("entity", {})
         order = entity.get("order", {}).get("entity", {})
+        
+        provider_event_id = headers.get("X-Razorpay-Event-Id") or headers.get("x-razorpay-event-id") or ""
+        order_id = payment.get("order_id") or order.get("id", "")
+        payment_id = payment.get("id", "")
+        idempotency_key = provider_event_id or payment_id
+
         if event_type in ("payment.captured", "order.paid"):
-            return ProviderWebhookEvent("payment_paid", payment.get("order_id") or order.get("id", ""), payment.get("id", ""), provider_event_id=payload.get("id", ""), idempotency_key=payload.get("id", "") or payment.get("id", ""), amount=_rupees(payment.get("amount")), raw=payload)
+            return ProviderWebhookEvent(
+                "payment_paid", order_id, payment_id,
+                provider_event_id=provider_event_id, idempotency_key=idempotency_key,
+                amount=_rupees(payment.get("amount")), raw=payload
+            )
         if event_type == "payment.failed":
-            return ProviderWebhookEvent("payment_failed", payment.get("order_id", ""), payment.get("id", ""), provider_event_id=payload.get("id", ""), idempotency_key=payload.get("id", "") or payment.get("id", ""), amount=_rupees(payment.get("amount")), raw=payload)
-        return ProviderWebhookEvent("ignored", provider_event_id=payload.get("id", ""), raw=payload)
+            return ProviderWebhookEvent(
+                "payment_failed", order_id, payment_id,
+                provider_event_id=provider_event_id, idempotency_key=idempotency_key,
+                amount=_rupees(payment.get("amount")), raw=payload
+            )
+        return ProviderWebhookEvent(
+            event_type or "ignored", order_id, payment_id,
+            provider_event_id=provider_event_id, idempotency_key=idempotency_key, raw=payload
+        )
 
 
 class CashfreeProvider(BaseProvider):

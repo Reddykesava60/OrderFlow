@@ -90,13 +90,16 @@ def verify_payment_access_token(payment, token, *, max_age=86400):
     )
 
 
-def _parse_webhook_timestamp(headers):
+def _parse_webhook_timestamp(headers, payload=None):
     raw_timestamp = (
         headers.get("x-webhook-timestamp")
         or headers.get("X-Webhook-Timestamp")
         or headers.get("x-razorpay-timestamp")
         or headers.get("X-Razorpay-Timestamp")
     )
+    if not raw_timestamp and payload and isinstance(payload, dict):
+        raw_timestamp = payload.get("created_at")
+
     if not raw_timestamp:
         return None
 
@@ -113,8 +116,8 @@ def _parse_webhook_timestamp(headers):
     return parsed
 
 
-def _is_webhook_timestamp_fresh(headers):
-    parsed = _parse_webhook_timestamp(headers)
+def _is_webhook_timestamp_fresh(headers, payload=None):
+    parsed = _parse_webhook_timestamp(headers, payload)
     if parsed is None:
         # Missing timestamp is suspicious but allowed for backward compatibility
         # with older Razorpay webhook configurations.
@@ -662,7 +665,7 @@ class WebhookIngestionService:
             return None
 
         # Replay protection
-        if not _is_webhook_timestamp_fresh(headers):
+        if not _is_webhook_timestamp_fresh(headers, payload):
             logger.warning(
                 "payment_webhook_replay_rejected provider=%s event_id=%s "
                 "payment_id=%s",
