@@ -173,7 +173,7 @@ internal accountability needs.
   recover the staff identity. This is a known gap to address in a
   follow-up.
 
-## Next
+## Next steps
 
 [Local Development Setup](./11-local-development-setup.md) gets you a
 running instance to explore all of the above hands-on.
