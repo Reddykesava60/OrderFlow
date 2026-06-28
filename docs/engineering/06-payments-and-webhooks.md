@@ -44,8 +44,9 @@ arrives at `POST /payments/webhook/<provider>/`:
 1. Parse the payload and figure out which `PaymentTransaction` it refers
    to.
 2. **Replay protection**: reject the webhook outright if its timestamp is
-   outside the allowed freshness window — this stops a captured, old
-   webhook payload from being replayed later to forge a state change.
+   outside the allowed freshness window. For Razorpay, the timestamp is
+   read from the parsed JSON payload's `created_at` field (a Unix
+   timestamp); other providers may supply it via a header instead.
 3. **Signature verification**: resolve the right webhook secret (via the
    resolver above) and cryptographically verify the payload actually came
    from the gateway and wasn't tampered with in transit.
@@ -53,7 +54,9 @@ arrives at `POST /payments/webhook/<provider>/`:
    same raw payload hash) for this restaurant has already been seen, the
    existing `WebhookLog` is returned and nothing new happens — Razorpay
    redelivering the same event, or an operator manually clicking "resend"
-   in their dashboard, is always safe.
+   in their dashboard, is always safe. For Razorpay, the event ID is
+   sourced from the `X-Razorpay-Event-Id` HTTP header (not from the JSON
+   payload body), matching Razorpay's actual delivery behavior.
 5. Store the raw payload as a `WebhookLog` row, **before** any business
    logic runs.
 

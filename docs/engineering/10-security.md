@@ -35,6 +35,14 @@ paper than it is in practice.
   account can do on the KDS — a restaurant can, for example, give someone
   cash-handling permission without giving them the ability to bulk-complete
   other staff's tickets.
+- **Enforcement ordering**: `CashCollectionMixin`, `OrderCompletionMixin`,
+  and `OwnerRequiredMixin` all enforce their permission checks **before**
+  calling `super().dispatch()`, so the view body never executes and no
+  database side-effects (ledger writes, status transitions, audit entries)
+  can occur for an unauthorized request. Each mixin duplicates the base
+  `ActiveStaffMixin` authentication guards (`is_authenticated`,
+  `is_active`, superuser/no-restaurant check) to ensure safety even if
+  called outside the normal MRO.
 - `StaffFilter` further restricts *which menu items* a staff account's KDS
   view shows — useful for a restaurant that wants a bar station to only
   see drink orders, for example.
@@ -145,6 +153,25 @@ a customer, resetting a PIN, recording a manual payment, staff account
 changes) with a structured `details` JSON payload — useful both for
 "who did this" investigations and for satisfying a restaurant's own
 internal accountability needs.
+
+**Known limitations**:
+
+- **Django Admin bypass**: A platform superuser can change permission
+  flags (`allow_cash_collection`, `allow_order_completion`, `role`)
+  directly through Django Admin without going through the owner dashboard.
+  These changes are recorded in Django's built-in `LogEntry` table, **not**
+  in `OwnerAuditLog`, creating a blind spot in the owner-visible audit
+  trail.
+- **Order status actions are unauditable**: `Order`, `OrderItem`, and
+  `OrderItemAddOn` have no actor/user field — there is currently no
+  record of *who* started prep or completed an item. This is a known gap
+  to address in a follow-up.
+- **Ledger `created_by` is NULL for cash collections**:
+  `RestaurantLedgerService.record_cash_payment()` does not thread the
+  acting user through to `RestaurantLedger.created_by`. Auditing cash
+  collections currently requires joining through `PaymentEvent` to
+  recover the staff identity. This is a known gap to address in a
+  follow-up.
 
 ## Next
 

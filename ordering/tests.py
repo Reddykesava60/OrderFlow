@@ -599,13 +599,16 @@ class TestUpiPaymentStateIntegrity(TestCase):
             raw={'source': 'test'},
         )
 
-    def _signed_headers(self, body):
+    def _signed_headers(self, body, event_id=None):
         signature = hmac.new(
             self.restaurant.payment_config.razorpay_webhook_secret.encode('utf-8'),
             body,
             hashlib.sha256,
         ).hexdigest()
-        return {'X-Razorpay-Signature': signature}
+        headers = {'X-Razorpay-Signature': signature}
+        if event_id:
+            headers['X-Razorpay-Event-Id'] = event_id
+        return headers
 
     def _webhook_payload(self, event_name, provider_order_id='order_integrity_123', provider_payment_id='pay_integrity_123', event_id='evt_integrity_123'):
         return {
@@ -791,7 +794,7 @@ class TestUpiPaymentStateIntegrity(TestCase):
         order, payment = self._place_reserved_upi_order()
         payload = self._webhook_payload('payment.captured', event_id='evt_capture_dupe')
         body = json.dumps(payload).encode('utf-8')
-        headers = self._signed_headers(body)
+        headers = self._signed_headers(body, event_id='evt_capture_dupe')
 
         # Action: duplicate webhook deliveries are received and processed.
         log1 = WebhookIngestionService().receive('razorpay', body, headers)
@@ -814,7 +817,7 @@ class TestUpiPaymentStateIntegrity(TestCase):
         order, payment = self._place_reserved_upi_order()
         payload = self._webhook_payload('payment.failed', provider_payment_id='pay_failed_webhook', event_id='evt_failed_dupe')
         body = json.dumps(payload).encode('utf-8')
-        headers = self._signed_headers(body)
+        headers = self._signed_headers(body, event_id='evt_failed_dupe')
 
         # Action: duplicate failed webhook deliveries are received and processed.
         log1 = WebhookIngestionService().receive('razorpay', body, headers)
@@ -837,7 +840,7 @@ class TestUpiPaymentStateIntegrity(TestCase):
         order, payment = self._place_reserved_upi_order()
         payload = self._webhook_payload('payment.captured', event_id='evt_same_event_race')
         body = json.dumps(payload).encode('utf-8')
-        headers = self._signed_headers(body)
+        headers = self._signed_headers(body, event_id='evt_same_event_race')
         log = WebhookIngestionService().receive('razorpay', body, headers)
 
         # Action: the same log is processed twice, as can happen after retries/restarts.
