@@ -145,9 +145,6 @@
                <a href="{% url 'owner:menu_qr_download' %}" download class="bg-white text-brand-800 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg active:scale-95">
                   Download QR
                </a>
-               {% if restaurant.menu_qr_code_url %}
-               <a href="{{ restaurant.menu_qr_code_url }}" target="_blank" class="px-4 py-2.5 text-xs font-bold text-white/80 hover:text-white transition-all underline">View Public Image</a>
-               {% endif %}
             </div>
          </div>
       </div>
