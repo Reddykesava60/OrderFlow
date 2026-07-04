@@ -75,7 +75,7 @@ class OwnerRequiredMixin(ActiveStaffMixin):
         from django.urls import reverse
         exempt_paths = [reverse('owner:mfa_setup'), reverse('owner:mfa_verify'), reverse('owner:logout')]
         if request.path not in exempt_paths:
-            if not request.user.is_verified():
+            if getattr(request.user, 'mfa_enabled', False) and not request.user.is_verified():
                 return redirect('owner:mfa_verify')
                 
         return super().dispatch(request, *args, **kwargs)
