@@ -142,7 +142,7 @@
             <h3 class="text-lg font-black tracking-tight">Generate QR Menu</h3>
             <p class="text-xs font-medium text-white/60 mt-1 uppercase tracking-widest">Print this for your tables</p>
             <div class="mt-4 flex flex-wrap justify-center md:justify-start gap-3">
-               <a href="{% url 'owner:menu_qr_download' %}" class="bg-white text-brand-800 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg active:scale-95">
+               <a href="{% url 'owner:menu_qr_download' %}" download class="bg-white text-brand-800 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg active:scale-95">
                   Download QR
                </a>
                {% if restaurant.menu_qr_code_url %}

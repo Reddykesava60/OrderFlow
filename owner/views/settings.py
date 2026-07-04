@@ -114,25 +114,40 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         qr_w, qr_h = qr_img.size
 
         # ── Prepare fonts ────────────────────────────────────────────────
-        try:
-            title_font = ImageFont.truetype("arialbd.ttf", 36)
-        except (OSError, IOError):
-            try:
-                title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
-            except (OSError, IOError):
-                title_font = ImageFont.load_default()
+        import os
 
-        try:
-            subtitle_font = ImageFont.truetype("arial.ttf", 26)
-        except (OSError, IOError):
-            try:
-                subtitle_font = ImageFont.truetype("DejaVuSans.ttf", 26)
-            except (OSError, IOError):
-                subtitle_font = ImageFont.load_default()
+        def _find_font(names, size):
+            """Try system font directories for the first match, then Pillow default."""
+            search_dirs = [
+                '/usr/share/fonts/truetype/dejavu',
+                '/usr/share/fonts/truetype/liberation',
+                '/usr/share/fonts/truetype',
+                '/usr/share/fonts',
+                'C:\\Windows\\Fonts',
+            ]
+            for name in names:
+                # Try bare name first (Pillow's own search)
+                try:
+                    return ImageFont.truetype(name, size)
+                except (OSError, IOError):
+                    pass
+                # Try with full paths
+                for d in search_dirs:
+                    path = os.path.join(d, name)
+                    if os.path.isfile(path):
+                        try:
+                            return ImageFont.truetype(path, size)
+                        except (OSError, IOError):
+                            pass
+            return ImageFont.load_default(size=size)
+
+        title_font   = _find_font(['arialbd.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf'], 42)
+        subtitle_font = _find_font(['arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf'], 28)
+        caption_font  = _find_font(['arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf'], 18)
 
         # ── Measure text ─────────────────────────────────────────────────
         title_text = restaurant.name
-        subtitle_text = "―  Scan to Order  ―"
+        subtitle_text = "Scan to Order"
         caption_text = "Point your phone camera at the code"
 
         dummy = ImageDraw.Draw(Image.new('RGB', (1, 1)))
@@ -144,23 +159,15 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         subtitle_w = subtitle_bbox[2] - subtitle_bbox[0]
         subtitle_h = subtitle_bbox[3] - subtitle_bbox[1]
 
-        try:
-            caption_font = ImageFont.truetype("arial.ttf", 16)
-        except (OSError, IOError):
-            try:
-                caption_font = ImageFont.truetype("DejaVuSans.ttf", 16)
-            except (OSError, IOError):
-                caption_font = ImageFont.load_default()
-
         caption_bbox = dummy.textbbox((0, 0), caption_text, font=caption_font)
         caption_w = caption_bbox[2] - caption_bbox[0]
         caption_h = caption_bbox[3] - caption_bbox[1]
 
         # ── Compose final image ──────────────────────────────────────────
-        padding = 40
-        gap = 20
-        line_gap = 14          # space around the separator line
-        caption_gap = 8        # space between subtitle and caption
+        padding = 48
+        gap = 24
+        line_gap = 16          # space around the separator line
+        caption_gap = 10       # space between subtitle and caption
         canvas_w = max(qr_w, title_w, subtitle_w, caption_w) + padding * 2
         canvas_h = (padding + title_h + gap
                     + qr_h
@@ -174,7 +181,7 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         # Restaurant name (centred above QR)
         title_x = (canvas_w - title_w) // 2
         title_y = padding
-        draw.text((title_x, title_y), title_text, fill='black', font=title_font)
+        draw.text((title_x, title_y), title_text, fill='#111111', font=title_font)
 
         # QR code (centred)
         qr_x = (canvas_w - qr_w) // 2
@@ -183,10 +190,10 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
 
         # Thin separator line
         line_y = qr_y + qr_h + line_gap
-        line_margin = padding + 30
-        draw.line([(line_margin, line_y), (canvas_w - line_margin, line_y)], fill='#CCCCCC', width=1)
+        line_margin = padding + 40
+        draw.line([(line_margin, line_y), (canvas_w - line_margin, line_y)], fill='#DDDDDD', width=1)
 
-        # "― Scan to Order ―" (centred below line)
+        # "Scan to Order" (centred below line)
         subtitle_x = (canvas_w - subtitle_w) // 2
         subtitle_y = line_y + line_gap
         draw.text((subtitle_x, subtitle_y), subtitle_text, fill='#222222', font=subtitle_font)

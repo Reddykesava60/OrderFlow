@@ -60,6 +60,7 @@ RUN apt-get update && \
         postgresql-client \
         libjpeg62-turbo \
         libwebp7 \
+        fonts-dejavu-core \
         curl && \
     rm -rf /var/lib/apt/lists/*
 
