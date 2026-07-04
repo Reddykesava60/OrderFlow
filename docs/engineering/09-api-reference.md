@@ -116,9 +116,9 @@ flag set on the `User`, all trigger a KDS broadcast on success:
 
 | Endpoint | Effect |
 |---|---|
-| `POST /api/order/<order_id>/start-prep/` | Marks every pending item/add-on on the order as `PREPARING` |
-| `POST /api/item/<item_id>/start-prep/` | Marks a single `OrderItem` as `PREPARING` |
-| `POST /api/addon/<addon_id>/start-prep/` | Marks a single `OrderItemAddOn` as `PREPARING` |
+| `POST /api/order/<order_id>/start-prep/` | Marks every pending item/add-on on the order as `PREPARING` (or `COMPLETED` if `kds_prep_enabled` is false) |
+| `POST /api/item/<item_id>/start-prep/` | Marks a single `OrderItem` as `PREPARING` (or `COMPLETED` if `kds_prep_enabled` is false) |
+| `POST /api/addon/<addon_id>/start-prep/` | Marks a single `OrderItemAddOn` as `PREPARING` (or `COMPLETED` if `kds_prep_enabled` is false) |
 | `POST /api/item/<item_id>/complete/` | Marks a single `OrderItem` as `COMPLETED` |
 | `POST /api/addon/<addon_id>/complete/` | Marks a single `OrderItemAddOn` as `COMPLETED` |
 | `POST /api/order/<order_id>/complete-all/` | Marks every item/add-on on the order `COMPLETED` (requires `allow_order_completion` **and** `allow_view_all_orders`, or owner role) |

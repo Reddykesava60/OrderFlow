@@ -27,7 +27,7 @@ UNPAID ──► PENDING ──► PREP_STARTED ──► COMPLETED
 |---|---|---|
 | `UNPAID` | The default state the instant an order is created. | `place_cash_order()` / `place_upi_order()` / `place_post_payment_order()` in `ordering/checkout/services.py` |
 | `PENDING` | Payment confirmed. The ticket is now live in the kitchen. | Cash: staff taps "Collect Cash" (`confirm_cash_payment`). UPI: the webhook-driven `PaymentMutationService.mark_paid()` confirms it. Post-payment: confirmed immediately at checkout, since the customer's account is charged, not a gateway. |
-| `PREP_STARTED` | Kitchen has started on at least one item. | Computed by `sync_order_status()`, based on whether any `OrderItem`/`OrderItemAddOn` is `PREPARING` |
+| `PREP_STARTED` | Kitchen has started on at least one item. | Computed by `sync_order_status()`, based on whether any `OrderItem`/`OrderItemAddOn` is `PREPARING`. This state is skipped entirely if the restaurant's `kds_prep_enabled` config is off. |
 | `COMPLETED` | Every item and add-on is done. | Computed by `sync_order_status()`, based on whether everything is `COMPLETED` |
 | `CANCELLED` | Order will never be fulfilled. | Cash payment timeout, UPI payment failure/expiry, or manual cancellation |
 

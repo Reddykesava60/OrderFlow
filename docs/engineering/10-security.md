@@ -67,10 +67,7 @@ Postgres Row-Level Security is also enabled on every table
 precise about what that migration actually does: it exists to satisfy
 Supabase's own security advisor, which flags any table reachable through
 Supabase's auto-generated REST API (`PostgREST`) without RLS as a
-vulnerability. **Django itself connects as the database owner, which
-bypasses RLS entirely** — the migration explicitly notes this. In other
-words, RLS here is a guard against a *different* access path (the
-Supabase API surface, which this application doesn't use for tenant
+vulnerability. Historically, it was assumed Django connects as a superuser which bypasses RLS, but if deployed with a non-superuser role, RLS will block Django from accessing its own tables. This is why the migration adds an explicit policy to `django_migrations` so Django can always read its migration history. However, for tenant data, RLS here is a guard against a *different* access path (the Supabase API surface, which this application doesn't use for tenant
 data), not a second enforcement layer underneath the Django app. If you're
 relying on "RLS will catch it" as a backstop for an application-level bug,
 it won't — the only real backstop is correct query scoping in the view/
