@@ -17,6 +17,9 @@ paper than it is in practice.
   It is set up via `/owner/mfa/setup/` (or `/admin/mfa/setup/` for platform admins) 
   and required on subsequent logins once confirmed. The authentication 
   happens in a dedicated 2-step verification flow after standard username/password login.
+  Both `OwnerRequiredMixin` and `AdminMfaMiddleware` gate on
+  `user.mfa_enabled` before checking `is_verified()`, so users with MFA
+  disabled bypass the verification redirect entirely.
 - **Customers** (for the post-payment/tab feature) authenticate with a
   restaurant-scoped serial number + PIN, not a password. PINs are hashed
   with a dedicated hasher (`core.hashers.CustomerPINHasher`, PBKDF2 with

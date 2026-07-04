@@ -103,7 +103,7 @@ specifically there for incident response — see
 | `views/dashboard.py` | Main dashboard, reconciliation screen |
 | `views/menu.py` | Menu item / add-on / category CRUD |
 | `views/staff.py` | Staff account management, permission toggles |
-| `views/settings.py` | Restaurant config, QR code download |
+| `views/settings.py` | Restaurant config, branded QR code download (with restaurant name and scan prompt) |
 | `views/reports.py` | Owner-facing order receipts |
 | `views_customers.py` | Customer accounts (for the post-payment/tab feature) |
 
