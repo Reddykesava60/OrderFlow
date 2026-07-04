@@ -53,6 +53,10 @@ class RestaurantConfig(models.Model):
     reopen_message  = models.CharField(max_length=300, blank=True)
     cash_enabled    = models.BooleanField(default=True)
     upi_enabled     = models.BooleanField(default=True)
+    kds_prep_enabled = models.BooleanField(
+        default=True,
+        help_text='When off, tapping Start in the KDS marks items complete immediately — no separate preparing step.',
+    )
     dpa_accepted_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):

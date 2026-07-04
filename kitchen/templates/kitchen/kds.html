@@ -130,7 +130,7 @@
                       class="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-brand-700 transition hover:bg-brand-100"
                       :disabled="isLoading('bulk-start-' + order.id)"
                       @click="startAll(order.id)">
-                <span x-text="isLoading('bulk-start-' + order.id) ? 'Processing...' : 'Start All'"></span>
+                <span x-text="isLoading('bulk-start-' + order.id) ? 'Processing...' : (kdsPrepEnabled ? 'Start All' : 'Complete All')"></span>
               </button>
             </div>
 
@@ -181,7 +181,7 @@
                           class="w-full rounded-2xl bg-brand-800 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-white shadow-lg shadow-brand-100 transition active:scale-[0.98] md:w-auto"
                           :disabled="isLoading('start-' + unit.kind + '-' + unit.id)"
                           @click="startWork(unit)">
-                    <span x-text="isLoading('start-' + unit.kind + '-' + unit.id) ? 'Wait...' : 'Start Prep'"></span>
+                    <span x-text="isLoading('start-' + unit.kind + '-' + unit.id) ? 'Wait...' : (kdsPrepEnabled ? 'Start Prep' : 'Mark Done')"></span>
                   </button>
                 </div>
               </template>
@@ -454,6 +454,7 @@
         allOrders: [],
         counts: { kitchen: 0, preparing: 0, payments: 0, all_orders: 0 },
         cashTimeoutMinutes: 10,
+        kdsPrepEnabled: {{ kds_prep_enabled|yesno:"true,false" }},
         loaded: false,
         online: true,
         failCount: 0,
@@ -714,7 +715,7 @@
             try {
               await this.doPost('/api/order/' + orderId + '/start-prep/');
               this.flashSuccess('bulk-start-' + orderId);
-              this.showToast('Order moved to preparing', 'success');
+              this.showToast(this.kdsPrepEnabled ? 'Order moved to preparing' : 'Order completed', 'success');
               await this.poll();
             } catch (error) {
               this.showToast(error.message, 'error');
@@ -757,7 +758,7 @@
             try {
               await this.doPost(this.startUrl(unit));
               this.flashSuccess(key);
-              this.showToast('Prep started', 'success');
+              this.showToast(this.kdsPrepEnabled ? 'Prep started' : 'Marked done', 'success');
               await this.poll();
             } catch (error) {
               this.showToast(error.message, 'error');

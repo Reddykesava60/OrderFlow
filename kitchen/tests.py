@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -299,3 +300,114 @@ class KDSActionPermissionTests(TestCase):
         self.client.force_login(staff)
         response = self.client.post(reverse('kitchen:start_item_prep', args=[order_item.id]))
         self.assertEqual(response.status_code, 403)
+
+
+class KDSPrepToggleTests(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name='Prep Toggle Test', slug='prep-toggle')
+        self.item_type = ItemType.objects.create(restaurant=self.restaurant, name='Main', sort_order=1)
+        self.item = MenuItem.objects.create(
+            restaurant=self.restaurant,
+            item_type=self.item_type,
+            name='Dosa',
+            base_price=Decimal('55.00'),
+            stock=5,
+        )
+        self.addon = AddOn.objects.create(
+            restaurant=self.restaurant,
+            name='Extra Chutney',
+            price=Decimal('5.00'),
+            max_qty=5,
+            is_active=True,
+        )
+        MenuItemAddOn.objects.create(menu_item=self.item, addon=self.addon)
+        self.user = get_user_model().objects.create_user(
+            username='kdstoggle',
+            password='pass1234',
+            role='STAFF',
+            restaurant=self.restaurant,
+            allow_order_completion=True,
+            allow_view_all_orders=True,
+        )
+        self.client.force_login(self.user)
+
+    def _create_order(self):
+        order = place_cash_order(
+            self.restaurant,
+            cart_lines=[{
+                'item_id': str(self.item.id),
+                'quantity': 1,
+                'dining_option': 'DINE_IN',
+                'addons': [{'addon_id': str(self.addon.id), 'quantity': 1}],
+            }],
+            customer_name='Bob',
+            table_number='B1',
+        )
+        Order.objects.filter(id=order.id).update(status=Order.Status.PENDING)
+        order.refresh_from_db()
+        return order
+
+    def test_prep_on_start_prep_goes_to_preparing(self):
+        # Default is kds_prep_enabled=True
+        order = self._create_order()
+        response = self.client.post(reverse('kitchen:start_prep', args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+
+        order_item = order.items.first()
+        item_addon = order_item.addons.first()
+        self.assertEqual(order_item.prep_status, WorkStatus.PREPARING)
+        self.assertEqual(item_addon.prep_status, WorkStatus.PREPARING)
+
+    def test_prep_off_start_prep_goes_to_completed(self):
+        self.restaurant.config.kds_prep_enabled = False
+        self.restaurant.config.save()
+
+        order = self._create_order()
+        response = self.client.post(reverse('kitchen:start_prep', args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+
+        order_item = order.items.first()
+        item_addon = order_item.addons.first()
+        self.assertEqual(order_item.prep_status, WorkStatus.COMPLETED)
+        self.assertEqual(item_addon.prep_status, WorkStatus.COMPLETED)
+
+    @patch('kitchen.views.trigger_kds_refresh')
+    def test_prep_off_start_prep_triggers_refresh(self, mock_refresh):
+        self.restaurant.config.kds_prep_enabled = False
+        self.restaurant.config.save()
+
+        order = self._create_order()
+        response = self.client.post(reverse('kitchen:start_prep', args=[order.id]))
+        self.assertEqual(response.status_code, 200)
+        mock_refresh.assert_called_once_with(self.restaurant.id)
+
+    def test_prep_off_start_item_prep_goes_to_completed(self):
+        self.restaurant.config.kds_prep_enabled = False
+        self.restaurant.config.save()
+
+        order = self._create_order()
+        order_item = order.items.first()
+        response = self.client.post(reverse('kitchen:start_item_prep', args=[order_item.id]))
+        self.assertEqual(response.status_code, 200)
+
+        order_item.refresh_from_db()
+        item_addon = order_item.addons.first()
+        self.assertEqual(order_item.prep_status, WorkStatus.COMPLETED)
+        # _complete_item_group completes the item and its addons
+        self.assertEqual(item_addon.prep_status, WorkStatus.COMPLETED)
+
+    def test_prep_off_start_addon_prep_goes_to_completed(self):
+        self.restaurant.config.kds_prep_enabled = False
+        self.restaurant.config.save()
+
+        order = self._create_order()
+        order_item = order.items.first()
+        item_addon = order_item.addons.first()
+        response = self.client.post(reverse('kitchen:start_addon_prep', args=[item_addon.id]))
+        self.assertEqual(response.status_code, 200)
+
+        order_item.refresh_from_db()
+        item_addon.refresh_from_db()
+        # _complete_item_group completes the item and its addons
+        self.assertEqual(order_item.prep_status, WorkStatus.COMPLETED)
+        self.assertEqual(item_addon.prep_status, WorkStatus.COMPLETED)

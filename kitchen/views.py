@@ -261,9 +261,11 @@ def _complete_item_group(item, user):
 
 class KDSView(ActiveStaffMixin, View):
     def get(self, request):
+        restaurant = self.get_restaurant()
         return render(request, "kitchen/kds.html", {
             "user": request.user,
-            "restaurant": self.get_restaurant(),
+            "restaurant": restaurant,
+            "kds_prep_enabled": restaurant.config.kds_prep_enabled,
         })
 
 def _incr_metric(key):
@@ -548,29 +550,53 @@ class StartPrepView(OrderCompletionMixin, View):
                     }, status=409)
 
                 now = timezone.now()
-                item_count = (
-                    OrderItem.objects
-                    .filter(order=order, prep_status=WorkStatus.PENDING)
-                    .update(
-                        prep_status=WorkStatus.PREPARING,
+                if not restaurant.config.kds_prep_enabled:
+                    pending_items = OrderItem.objects.filter(order=order).exclude(prep_status=WorkStatus.COMPLETED)
+                    pending_addons = OrderItemAddOn.objects.filter(order_item__order=order).exclude(prep_status=WorkStatus.COMPLETED)
+                    if not pending_items.exists() and not pending_addons.exists():
+                        return JsonResponse({
+                            "error": "INVALID_STATUS",
+                            "message": "No pending work remains on this order.",
+                        }, status=409)
+
+                    pending_items.update(
+                        prep_status=WorkStatus.COMPLETED,
+                        completed_at=now,
+                        completed_by=request.user,
                         prep_started_at=now,
                         prep_started_by=request.user,
                     )
-                )
-                addon_count = (
-                    OrderItemAddOn.objects
-                    .filter(order_item__order=order, prep_status=WorkStatus.PENDING)
-                    .update(
-                        prep_status=WorkStatus.PREPARING,
+                    pending_addons.update(
+                        prep_status=WorkStatus.COMPLETED,
+                        completed_at=now,
+                        completed_by=request.user,
                         prep_started_at=now,
                         prep_started_by=request.user,
                     )
-                )
-                if item_count == 0 and addon_count == 0:
-                    return JsonResponse({
-                        "error": "INVALID_STATUS",
-                        "message": "No pending work remains on this order.",
-                    }, status=409)
+                else:
+                    item_count = (
+                        OrderItem.objects
+                        .filter(order=order, prep_status=WorkStatus.PENDING)
+                        .update(
+                            prep_status=WorkStatus.PREPARING,
+                            prep_started_at=now,
+                            prep_started_by=request.user,
+                        )
+                    )
+                    addon_count = (
+                        OrderItemAddOn.objects
+                        .filter(order_item__order=order, prep_status=WorkStatus.PENDING)
+                        .update(
+                            prep_status=WorkStatus.PREPARING,
+                            prep_started_at=now,
+                            prep_started_by=request.user,
+                        )
+                    )
+                    if item_count == 0 and addon_count == 0:
+                        return JsonResponse({
+                            "error": "INVALID_STATUS",
+                            "message": "No pending work remains on this order.",
+                        }, status=409)
 
                 order = sync_order_status(order)
         except Order.DoesNotExist:
@@ -604,10 +630,15 @@ class StartItemPrepView(OrderCompletionMixin, View):
                         "message": f"Order is {order.status}.",
                     }, status=409)
 
-                if not _start_item_group(item, request.user):
+                if not restaurant.config.kds_prep_enabled:
+                    success = _complete_item_group(item, request.user)
+                else:
+                    success = _start_item_group(item, request.user)
+
+                if not success:
                     return JsonResponse({
                         "error": "INVALID_STATUS",
-                        "message": "This item is already in progress.",
+                        "message": "This item is already in progress or completed.",
                     }, status=409)
 
                 order = sync_order_status(order)
@@ -647,10 +678,15 @@ class StartAddOnPrepView(OrderCompletionMixin, View):
                         "message": f"Order is {order.status}.",
                     }, status=409)
 
-                if not _start_item_group(item, request.user):
+                if not restaurant.config.kds_prep_enabled:
+                    success = _complete_item_group(item, request.user)
+                else:
+                    success = _start_item_group(item, request.user)
+
+                if not success:
                     return JsonResponse({
                         "error": "INVALID_STATUS",
-                        "message": "This item is already in progress.",
+                        "message": "This item is already in progress or completed.",
                     }, status=409)
 
                 order = sync_order_status(order)

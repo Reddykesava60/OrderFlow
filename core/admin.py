@@ -25,7 +25,7 @@ class RestaurantConfigInline(admin.StackedInline):
     model = RestaurantConfig
     can_delete = False
     verbose_name_plural = 'Restaurant config'
-    fields = ('is_open', 'reopen_message', 'cash_enabled', 'upi_enabled')
+    fields = ('is_open', 'reopen_message', 'cash_enabled', 'upi_enabled', 'kds_prep_enabled')
 
 
 class RestaurantPaymentConfigInline(admin.StackedInline):

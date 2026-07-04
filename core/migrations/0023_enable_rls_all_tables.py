@@ -26,11 +26,11 @@ BEGIN
          WHERE schemaname = 'public'
     LOOP
         -- Enable RLS (idempotent – no error if already enabled)
-        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
+        EXECUTE format('ALTER TABLE public.%%I ENABLE ROW LEVEL SECURITY', tbl);
 
         -- Revoke API-facing roles; ignore if roles don't exist (e.g. local dev)
         BEGIN
-            EXECUTE format('REVOKE ALL ON public.%I FROM anon, authenticated', tbl);
+            EXECUTE format('REVOKE ALL ON public.%%I FROM anon, authenticated', tbl);
         EXCEPTION WHEN undefined_object THEN
             NULL;  -- role does not exist, skip
         END;
@@ -48,7 +48,7 @@ BEGIN
           FROM pg_tables
          WHERE schemaname = 'public'
     LOOP
-        EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', tbl);
+        EXECUTE format('ALTER TABLE public.%%I DISABLE ROW LEVEL SECURITY', tbl);
     END LOOP;
 END $$;
 """
