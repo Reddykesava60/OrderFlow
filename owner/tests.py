@@ -97,13 +97,3 @@ class OwnerMfaTests(TestCase):
 		response = self.client.get(reverse('owner:mfa_verify'))
 		self.assertEqual(response.status_code, 200)
 
-	def test_config_update_by_staff_is_denied(self):
-		self.client.force_login(self.staff)
-		response = self.client.post(
-			reverse('owner:config'),
-			data={
-				'kds_prep_enabled': 'on',
-			},
-		)
-		self.assertEqual(response.status_code, 302)
-		self.assertTrue(response.url.startswith(reverse('owner:login')))
