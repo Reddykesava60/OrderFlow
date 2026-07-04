@@ -93,22 +93,114 @@ class ConfigView(OwnerRequiredMixin, View):
 class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
     """
     GET /owner/config/qr-code/menu.png
-    Generates a QR code pointing to the public menu URL and returns it as a download.
-    Also uploads the PNG to Supabase Storage if configured (bucket: qr-codes).
+    Generates a branded QR code with the restaurant name above and
+    "Scan to order" below. Returns it as a download and optionally
+    uploads to Supabase Storage.
     """
 
     def get(self, request):
+        from PIL import Image, ImageDraw, ImageFont
+
         restaurant = self.get_restaurant()
         menu_path = reverse('ordering:menu', args=[restaurant.slug])
         menu_url = request.build_absolute_uri(menu_path)
+
+        # ── Generate raw QR code ─────────────────────────────────────────
         import qrcode
-        qr = qrcode.QRCode(border=2, box_size=8)
+        qr = qrcode.QRCode(border=2, box_size=10)
         qr.add_data(menu_url)
         qr.make(fit=True)
-        img = qr.make_image(fill_color='black', back_color='white')
+        qr_img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
+        qr_w, qr_h = qr_img.size
+
+        # ── Prepare fonts ────────────────────────────────────────────────
+        try:
+            title_font = ImageFont.truetype("arialbd.ttf", 36)
+        except (OSError, IOError):
+            try:
+                title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
+            except (OSError, IOError):
+                title_font = ImageFont.load_default()
+
+        try:
+            subtitle_font = ImageFont.truetype("arial.ttf", 26)
+        except (OSError, IOError):
+            try:
+                subtitle_font = ImageFont.truetype("DejaVuSans.ttf", 26)
+            except (OSError, IOError):
+                subtitle_font = ImageFont.load_default()
+
+        # ── Measure text ─────────────────────────────────────────────────
+        title_text = restaurant.name
+        subtitle_text = "―  Scan to Order  ―"
+        caption_text = "Point your phone camera at the code"
+
+        dummy = ImageDraw.Draw(Image.new('RGB', (1, 1)))
+        title_bbox = dummy.textbbox((0, 0), title_text, font=title_font)
+        title_w = title_bbox[2] - title_bbox[0]
+        title_h = title_bbox[3] - title_bbox[1]
+
+        subtitle_bbox = dummy.textbbox((0, 0), subtitle_text, font=subtitle_font)
+        subtitle_w = subtitle_bbox[2] - subtitle_bbox[0]
+        subtitle_h = subtitle_bbox[3] - subtitle_bbox[1]
+
+        try:
+            caption_font = ImageFont.truetype("arial.ttf", 16)
+        except (OSError, IOError):
+            try:
+                caption_font = ImageFont.truetype("DejaVuSans.ttf", 16)
+            except (OSError, IOError):
+                caption_font = ImageFont.load_default()
+
+        caption_bbox = dummy.textbbox((0, 0), caption_text, font=caption_font)
+        caption_w = caption_bbox[2] - caption_bbox[0]
+        caption_h = caption_bbox[3] - caption_bbox[1]
+
+        # ── Compose final image ──────────────────────────────────────────
+        padding = 40
+        gap = 20
+        line_gap = 14          # space around the separator line
+        caption_gap = 8        # space between subtitle and caption
+        canvas_w = max(qr_w, title_w, subtitle_w, caption_w) + padding * 2
+        canvas_h = (padding + title_h + gap
+                    + qr_h
+                    + line_gap + 1 + line_gap   # separator line (1px)
+                    + subtitle_h + caption_gap + caption_h
+                    + padding)
+
+        canvas = Image.new('RGB', (canvas_w, canvas_h), 'white')
+        draw = ImageDraw.Draw(canvas)
+
+        # Restaurant name (centred above QR)
+        title_x = (canvas_w - title_w) // 2
+        title_y = padding
+        draw.text((title_x, title_y), title_text, fill='black', font=title_font)
+
+        # QR code (centred)
+        qr_x = (canvas_w - qr_w) // 2
+        qr_y = padding + title_h + gap
+        canvas.paste(qr_img, (qr_x, qr_y))
+
+        # Thin separator line
+        line_y = qr_y + qr_h + line_gap
+        line_margin = padding + 30
+        draw.line([(line_margin, line_y), (canvas_w - line_margin, line_y)], fill='#CCCCCC', width=1)
+
+        # "― Scan to Order ―" (centred below line)
+        subtitle_x = (canvas_w - subtitle_w) // 2
+        subtitle_y = line_y + line_gap
+        draw.text((subtitle_x, subtitle_y), subtitle_text, fill='#222222', font=subtitle_font)
+
+        # Helper caption (centred, lighter)
+        caption_x = (canvas_w - caption_w) // 2
+        caption_y = subtitle_y + subtitle_h + caption_gap
+        draw.text((caption_x, caption_y), caption_text, fill='#999999', font=caption_font)
+
+        # ── Save to bytes ────────────────────────────────────────────────
         buf = io.BytesIO()
-        img.save(buf)
+        canvas.save(buf, format='PNG')
         png_bytes = buf.getvalue()
+
         if get_supabase_storage_config():
             try:
                 public_url = upload_bytes_public(bucket='qr-codes', path=f'{restaurant.id}.png', content=png_bytes, content_type='image/png')
@@ -116,6 +208,7 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
                 restaurant.save(update_fields=['menu_qr_code_url'])
             except Exception:
                 logger.exception('Failed uploading menu QR code to Supabase Storage for %s', restaurant.id)
+
         response = HttpResponse(png_bytes, content_type='image/png')
         response['Content-Disposition'] = f'attachment; filename="{restaurant.slug}_menu_qr.png"'
         return response
