@@ -24,7 +24,7 @@ import qrcode
 from django_otp import login as otp_login
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
-from core.mixins import OwnerRequiredMixin
+from core.mixins import ActiveStaffMixin, OwnerRequiredMixin
 from core.models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
     OwnerAuditLog, PlatformFeeRecord, Restaurant, RestaurantPaymentConfig, StaffFilter, User,
@@ -87,12 +87,13 @@ class ChangePasswordView(View):
         return redirect('kitchen:kds')
 
 
-class MfaSetupView(OwnerRequiredMixin, View):
+class MfaSetupView(ActiveStaffMixin, View):
     def get(self, request):
-        if not request.user.mfa_enabled:
-            return redirect('owner:dashboard')
-        if request.user.is_verified():
-            return redirect('owner:dashboard')
+        home_url = 'owner:dashboard' if getattr(request.user, 'is_owner', False) else 'kitchen:kds'
+        if not getattr(request.user, 'mfa_enabled', False):
+            return redirect(home_url)
+        if getattr(request.user, 'is_verified', lambda: False)():
+            return redirect(home_url)
         
         device, created = TOTPDevice.objects.get_or_create(user=request.user, name="default")
         
@@ -105,10 +106,11 @@ class MfaSetupView(OwnerRequiredMixin, View):
         return render(request, 'owner/mfa_setup.html', {'qr_code': qr_b64, 'secret': device.key})
 
     def post(self, request):
-        if not request.user.mfa_enabled:
-            return redirect('owner:dashboard')
-        if request.user.is_verified():
-            return redirect('owner:dashboard')
+        home_url = 'owner:dashboard' if getattr(request.user, 'is_owner', False) else 'kitchen:kds'
+        if not getattr(request.user, 'mfa_enabled', False):
+            return redirect(home_url)
+        if getattr(request.user, 'is_verified', lambda: False)():
+            return redirect(home_url)
             
         token = request.POST.get('token', '').strip()
         device = TOTPDevice.objects.filter(user=request.user).first()
@@ -121,28 +123,30 @@ class MfaSetupView(OwnerRequiredMixin, View):
             device.confirmed = True
             device.save()
             otp_login(request, device)
-            return redirect('owner:dashboard')
+            return redirect(home_url)
             
         messages.error(request, "Invalid token. Try again.")
         return redirect('owner:mfa_setup')
 
 
-class MfaVerifyView(OwnerRequiredMixin, View):
+class MfaVerifyView(ActiveStaffMixin, View):
     def get(self, request):
-        if not request.user.mfa_enabled:
-            return redirect('owner:dashboard')
-        if request.user.is_verified():
-            return redirect('owner:dashboard')
+        home_url = 'owner:dashboard' if getattr(request.user, 'is_owner', False) else 'kitchen:kds'
+        if not getattr(request.user, 'mfa_enabled', False):
+            return redirect(home_url)
+        if getattr(request.user, 'is_verified', lambda: False)():
+            return redirect(home_url)
         device = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
         if not device:
             return redirect('owner:mfa_setup')
         return render(request, 'owner/mfa_verify.html')
         
     def post(self, request):
-        if not request.user.mfa_enabled:
-            return redirect('owner:dashboard')
-        if request.user.is_verified():
-            return redirect('owner:dashboard')
+        home_url = 'owner:dashboard' if getattr(request.user, 'is_owner', False) else 'kitchen:kds'
+        if not getattr(request.user, 'mfa_enabled', False):
+            return redirect(home_url)
+        if getattr(request.user, 'is_verified', lambda: False)():
+            return redirect(home_url)
         token = request.POST.get('token', '').strip()
         device = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
         if not device:
@@ -150,7 +154,7 @@ class MfaVerifyView(OwnerRequiredMixin, View):
             
         if device.verify_token(token):
             otp_login(request, device)
-            return redirect('owner:dashboard')
+            return redirect(home_url)
             
         messages.error(request, "Invalid code.")
         return redirect('owner:mfa_verify')

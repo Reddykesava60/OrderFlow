@@ -18,6 +18,14 @@ class ActiveStaffMixin(LoginRequiredMixin):
         # Superusers (platform dev) have no restaurant — block from staff views
         if request.user.is_superuser or not request.user.restaurant:
             return HttpResponseForbidden("Not a restaurant account.")
+
+        from django.urls import reverse
+        exempt_paths = [reverse('owner:mfa_setup'), reverse('owner:mfa_verify'), reverse('owner:logout')]
+        if request.path not in exempt_paths:
+            # Using getattr with a lambda for is_verified because django_otp monkey patches it
+            if getattr(request.user, 'mfa_enabled', False) and not getattr(request.user, 'is_verified', lambda: False)():
+                return redirect('owner:mfa_verify')
+
         return super().dispatch(request, *args, **kwargs)
 
     def get_restaurant(self):
@@ -72,10 +80,4 @@ class OwnerRequiredMixin(ActiveStaffMixin):
         if not getattr(request.user, 'is_owner', False):
             return HttpResponseForbidden("Owner access required.")
             
-        from django.urls import reverse
-        exempt_paths = [reverse('owner:mfa_setup'), reverse('owner:mfa_verify'), reverse('owner:logout')]
-        if request.path not in exempt_paths:
-            if getattr(request.user, 'mfa_enabled', False) and not request.user.is_verified():
-                return redirect('owner:mfa_verify')
-                
         return super().dispatch(request, *args, **kwargs)
