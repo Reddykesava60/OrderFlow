@@ -208,7 +208,14 @@ class AddOnEditView(OwnerRequiredMixin, View):
     def get(self, request, addon_id):
         restaurant = self.get_restaurant()
         addon = get_object_or_404(AddOn, id=addon_id, restaurant=restaurant)
-        return render(request, 'owner/addon_form.html', {'restaurant': restaurant, 'addon': addon})
+        menu_items = MenuItem.objects.filter(restaurant=restaurant).order_by('item_type__sort_order', 'sort_order', 'name')
+        linked_item_ids = list(MenuItemAddOn.objects.filter(addon=addon).values_list('menu_item_id', flat=True))
+        return render(request, 'owner/addon_form.html', {
+            'restaurant': restaurant,
+            'addon': addon,
+            'menu_items': menu_items,
+            'linked_item_ids': linked_item_ids,
+        })
 
     def post(self, request, addon_id):
         restaurant = self.get_restaurant()
@@ -227,6 +234,15 @@ class AddOnEditView(OwnerRequiredMixin, View):
                 except Exception as upload_err:
                     logger.exception('Add-on image upload failed for add-on %s', addon.id)
                     messages.warning(request, f'Image upload failed: {upload_err}')
+                    
+            raw_item_ids = request.POST.getlist('item_ids')
+            selected_item_ids = list(MenuItem.objects.filter(restaurant=restaurant, id__in=raw_item_ids).values_list('id', flat=True))
+            MenuItemAddOn.objects.filter(addon=addon).delete()
+            MenuItemAddOn.objects.bulk_create([
+                MenuItemAddOn(menu_item_id=item_id, addon=addon)
+                for item_id in selected_item_ids
+            ])
+            
             messages.success(request, f"'{addon.name}' updated.")
             return redirect('owner:menu')
         except Exception as e:
@@ -251,4 +267,41 @@ class ItemTypeCreateView(OwnerRequiredMixin, View):
         if name:
             ItemType.objects.get_or_create(restaurant=restaurant, name=name, defaults={'sort_order': 0})
             messages.success(request, f"Category '{name}' created.")
+        return redirect('owner:menu')
+
+class ItemTypeEditView(OwnerRequiredMixin, View):
+
+    def get(self, request, category_id):
+        restaurant = self.get_restaurant()
+        category = get_object_or_404(ItemType, id=category_id, restaurant=restaurant)
+        menu_items = MenuItem.objects.filter(restaurant=restaurant).order_by('sort_order', 'name')
+        linked_item_ids = list(category.items.values_list('id', flat=True))
+        return render(request, 'owner/category_form.html', {
+            'restaurant': restaurant,
+            'category': category,
+            'menu_items': menu_items,
+            'linked_item_ids': linked_item_ids,
+        })
+
+    def post(self, request, category_id):
+        restaurant = self.get_restaurant()
+        category = get_object_or_404(ItemType, id=category_id, restaurant=restaurant)
+        
+        name = request.POST.get('name', '').strip()
+        if name:
+            category.name = name
+            category.save()
+            
+        raw_item_ids = request.POST.getlist('item_ids')
+        selected_item_ids = list(MenuItem.objects.filter(restaurant=restaurant, id__in=raw_item_ids).values_list('id', flat=True))
+        
+        with transaction.atomic():
+            # Unlink items that are currently in this category but were NOT selected
+            MenuItem.objects.filter(restaurant=restaurant, item_type=category).exclude(id__in=selected_item_ids).update(item_type=None)
+            
+            # Link items that ARE selected to this category
+            if selected_item_ids:
+                MenuItem.objects.filter(restaurant=restaurant, id__in=selected_item_ids).update(item_type=category)
+                
+        messages.success(request, f"Category '{category.name}' updated.")
         return redirect('owner:menu')

@@ -1,0 +1,53 @@
+{% extends "owner/base.html" %}
+{% block title %}Edit Category{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-8">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Edit Category</h1>
+      <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">{{ category.name }}</p>
+    </div>
+    <a href="{% url 'owner:menu' %}" class="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-700">
+      <span>&larr;</span>
+      Back to menu
+    </a>
+  </div>
+
+  <form method="post" action="{% url 'owner:category_edit' category.id %}" class="space-y-6">
+    {% csrf_token %}
+    
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <div>
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Category Name *</label>
+          <input type="text" name="name" value="{{ category.name }}" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all mt-2">
+       </div>
+    </div>
+
+    <!-- Linked Items Section -->
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <div>
+          <h2 class="text-sm font-black text-slate-800 uppercase tracking-widest">Linked Items</h2>
+          <p class="text-[10px] font-bold text-slate-400 mt-0.5">Select menu items to include in this category</p>
+       </div>
+       <div class="grid gap-3 sm:grid-cols-2">
+          {% for item in menu_items %}
+          <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer hover:border-brand-300 transition-all">
+             <input type="checkbox" name="item_ids" value="{{ item.id }}" {% if item.id in linked_item_ids %}checked{% endif %} class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+             <span class="min-w-0">
+                <span class="block truncate text-sm font-bold text-slate-800">{{ item.name }}</span>
+                <span class="mt-0.5 block text-xs text-slate-400">{{ item.item_type.name|default:"Uncategorized" }}</span>
+             </span>
+          </label>
+          {% empty %}
+          <div class="col-span-full rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-400 text-center">No menu items found.</div>
+          {% endfor %}
+       </div>
+    </div>
+
+    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 active:scale-95 transition-all">
+       Update Category
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -27,6 +27,7 @@ urlpatterns = [
     path('menu/addon/<uuid:addon_id>/edit/', menu.AddOnEditView.as_view(), name='addon_edit'),
     path('menu/addon/<uuid:addon_id>/toggle/', menu.AddOnToggleView.as_view(), name='addon_toggle'),
     path('menu/category/add/',       menu.ItemTypeCreateView.as_view(),   name='category_add'),
+    path('menu/category/<uuid:category_id>/edit/', menu.ItemTypeEditView.as_view(), name='category_edit'),
     path('staff-filters/', staff.StaffFilterView.as_view(), name='staff_filters'),
     path('staff-filters/<uuid:filter_id>/edit/', staff.StaffFilterEditView.as_view(), name='staff_filter_edit'),
     path('staff-filters/<uuid:filter_id>/delete/', staff.StaffFilterDeleteView.as_view(), name='staff_filter_delete'),

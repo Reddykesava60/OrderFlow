@@ -63,6 +63,27 @@
        </div>
     </div>
 
+    <!-- Linked Items Section -->
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <div>
+          <h2 class="text-sm font-black text-slate-800 uppercase tracking-widest">Linked Items</h2>
+          <p class="text-[10px] font-bold text-slate-400 mt-0.5">Select menu items that can include this add-on</p>
+       </div>
+       <div class="grid gap-3 sm:grid-cols-2">
+          {% for item in menu_items %}
+          <label class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer hover:border-brand-300 transition-all">
+             <input type="checkbox" name="item_ids" value="{{ item.id }}" {% if item.id in linked_item_ids %}checked{% endif %} class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+             <span class="min-w-0">
+                <span class="block truncate text-sm font-bold text-slate-800">{{ item.name }}</span>
+                <span class="mt-0.5 block text-xs text-slate-400">{{ item.item_type.name|default:"Uncategorized" }}</span>
+             </span>
+          </label>
+          {% empty %}
+          <div class="col-span-full rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-400 text-center">No menu items found.</div>
+          {% endfor %}
+       </div>
+    </div>
+
     <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 active:scale-95 transition-all">
        Update Add-on
     </button>
