@@ -12,12 +12,12 @@ paper than it is in practice.
   Usernames are unique **per restaurant**, case-insensitively (a database
   constraint, not just application-level validation), so two different
   restaurants can each have a `manager` account without collision.
-- **Owners and Admins can enable TOTP-based MFA** (`django-otp` +
+- **Owners, Staff, and Admins can enable TOTP-based MFA** (`django-otp` +
   `otp_totp.TOTPDevice`) — a standard authenticator-app second factor.
   It is set up via `/owner/mfa/setup/` (or `/admin/mfa/setup/` for platform admins) 
   and required on subsequent logins once confirmed. The authentication 
   happens in a dedicated 2-step verification flow after standard username/password login.
-  Both `OwnerRequiredMixin` and `AdminMfaMiddleware` gate on
+  Both `ActiveStaffMixin` (which covers both owners and staff) and `AdminMfaMiddleware` gate on
   `user.mfa_enabled` before checking `is_verified()`, so users with MFA
   disabled bypass the verification redirect entirely.
 - **Customers** (for the post-payment/tab feature) authenticate with a
