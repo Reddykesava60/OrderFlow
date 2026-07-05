@@ -97,3 +97,73 @@ class OwnerMfaTests(TestCase):
 		response = self.client.get(reverse('owner:mfa_verify'))
 		self.assertEqual(response.status_code, 200)
 
+
+class KdsPrepEnabledTests(TestCase):
+	"""Tests for the kds_prep_enabled toggle on the owner config page."""
+
+	def setUp(self):
+		self.restaurant = Restaurant.objects.create(name='KDS Test', slug='kds-test')
+		self.owner = get_user_model().objects.create_user(
+			username='owner_kds',
+			password='pass1234',
+			role='OWNER',
+			restaurant=self.restaurant,
+		)
+		self.staff = get_user_model().objects.create_user(
+			username='staff_kds',
+			password='pass1234',
+			role='STAFF',
+			restaurant=self.restaurant,
+		)
+		# Pre-authenticate owner with MFA
+		self.client.force_login(self.owner)
+		from django_otp.plugins.otp_totp.models import TOTPDevice
+		device = TOTPDevice.objects.create(user=self.owner, confirmed=True)
+		session = self.client.session
+		session['otp_device_id'] = device.persistent_id
+		session.save()
+
+	def _post_config(self, extra=None):
+		"""POST to config with minimum valid data (cash_enabled on)."""
+		data = {
+			'cash_enabled': 'on',
+			'slug': self.restaurant.slug,
+		}
+		if extra:
+			data.update(extra)
+		return self.client.post(reverse('owner:config'), data=data)
+
+	def test_staff_cannot_toggle_kds_prep_enabled(self):
+		"""Staff-role user gets 403 and config stays unchanged."""
+		self.restaurant.config.kds_prep_enabled = True
+		self.restaurant.config.save()
+
+		self.client.force_login(self.staff)
+		response = self.client.post(
+			reverse('owner:config'),
+			data={'cash_enabled': 'on', 'slug': self.restaurant.slug},
+		)
+
+		self.assertEqual(response.status_code, 403)
+		self.restaurant.config.refresh_from_db()
+		self.assertTrue(self.restaurant.config.kds_prep_enabled)
+
+	def test_owner_can_toggle_kds_prep_enabled_and_audit_logged(self):
+		"""Owner toggles kds_prep_enabled True→False; value saved, audit recorded."""
+		self.restaurant.config.kds_prep_enabled = True
+		self.restaurant.config.save()
+
+		# POST without kds_prep_enabled checkbox → should set it to False
+		response = self._post_config()
+
+		self.assertEqual(response.status_code, 302)
+		self.restaurant.config.refresh_from_db()
+		self.assertFalse(self.restaurant.config.kds_prep_enabled)
+
+		# Verify audit log
+		log = OwnerAuditLog.objects.filter(
+			restaurant=self.restaurant,
+			action=OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG,
+		).latest('created_at')
+		self.assertTrue(log.details['restaurant_config_before']['kds_prep_enabled'])
+		self.assertFalse(log.details['restaurant_config_after']['kds_prep_enabled'])

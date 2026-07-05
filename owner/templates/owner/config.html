@@ -31,6 +31,21 @@
       </div>
     </div>
 
+    <!-- Kitchen Workflow Card -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+      <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Kitchen Workflow</h2>
+
+      <div class="grid grid-cols-1 gap-4">
+        <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
+          <input type="checkbox" name="kds_prep_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.kds_prep_enabled %}checked{% endif %}>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold text-slate-800">Kitchen Prep Stage</span>
+            <span class="text-[10px] font-medium text-slate-400 uppercase">When off, orders are marked complete the moment staff tap Start — no separate being prepared step</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <!-- Payment Configuration Card -->
     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-6">
       <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Payment Gateways</h2>
