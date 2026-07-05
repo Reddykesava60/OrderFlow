@@ -46,15 +46,24 @@
 
   <!-- Category Quick Links (Horizontal Scroll) -->
   <nav class="bg-white border-b border-slate-100 px-4 py-3 sticky top-[72px] z-[90] overflow-x-auto hide-scrollbar flex items-center gap-2">
+    <button @click="activeCategory = 'all'; window.scrollTo({top: 0, behavior: 'smooth'})"
+            :class="activeCategory === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
+      All
+    </button>
     {% for item_type, items in grouped.items %}
-    <a href="#cat-{{ item_type.id }}" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 bg-slate-50 text-slate-400 active:bg-brand-50 active:text-brand-700 transition-all">
+    <button @click="activeCategory = 'cat-{{ item_type.id }}'; window.scrollTo({top: 0, behavior: 'smooth'})"
+            :class="activeCategory === 'cat-{{ item_type.id }}' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
       {{ item_type.name }}
-    </a>
+    </button>
     {% endfor %}
     {% if ungrouped %}
-    <a href="#cat-other" class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100 bg-slate-50 text-slate-400 active:bg-brand-50 active:text-brand-700 transition-all">
+    <button @click="activeCategory = 'cat-other'; window.scrollTo({top: 0, behavior: 'smooth'})"
+            :class="activeCategory === 'cat-other' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
       Other
-    </a>
+    </button>
     {% endif %}
   </nav>
 
@@ -62,7 +71,7 @@
   <main class="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-10 mb-10">
     
     {% for item_type, items in grouped.items %}
-    <section id="cat-{{ item_type.id }}" class="space-y-4 scroll-mt-28">
+    <section id="cat-{{ item_type.id }}" x-show="activeCategory === 'all' || activeCategory === 'cat-{{ item_type.id }}'" x-transition.opacity.duration.300ms class="space-y-4">
       <div class="flex items-center gap-4">
         <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">{{ item_type.name }}</h2>
         <div class="flex-1 h-px bg-slate-200"></div>
@@ -76,7 +85,7 @@
     {% endfor %}
 
     {% if ungrouped %}
-    <section id="cat-other" class="space-y-4 scroll-mt-28">
+    <section id="cat-other" x-show="activeCategory === 'all' || activeCategory === 'cat-other'" x-transition.opacity.duration.300ms class="space-y-4">
       <div class="flex items-center gap-4">
         <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Other</h2>
         <div class="flex-1 h-px bg-slate-200"></div>
@@ -372,6 +381,7 @@
 
     function dineflow() {
       return {
+        activeCategory: 'all',
         cart:          [],
         activeItem:    null,
         selection:     { dining: 'DINE_IN', spice: 'MILD', qty: 1, addons: {} },
