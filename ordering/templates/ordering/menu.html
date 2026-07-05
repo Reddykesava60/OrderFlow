@@ -47,20 +47,20 @@
   <!-- Category Quick Links (Horizontal Scroll) -->
   <nav class="bg-white border-b border-slate-100 px-4 py-3 sticky top-[72px] z-[90] overflow-x-auto hide-scrollbar flex items-center gap-2">
     <button @click="activeCategory = 'all'; window.scrollTo({top: 0, behavior: 'smooth'})"
-            :class="activeCategory === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            :class="activeCategory === 'all' ? 'bg-brand-800 text-white border-brand-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
             class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
       All
     </button>
     {% for item_type, items in grouped.items %}
     <button @click="activeCategory = 'cat-{{ item_type.id }}'; window.scrollTo({top: 0, behavior: 'smooth'})"
-            :class="activeCategory === 'cat-{{ item_type.id }}' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            :class="activeCategory === 'cat-{{ item_type.id }}' ? 'bg-brand-800 text-white border-brand-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
             class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
       {{ item_type.name }}
     </button>
     {% endfor %}
     {% if ungrouped %}
     <button @click="activeCategory = 'cat-other'; window.scrollTo({top: 0, behavior: 'smooth'})"
-            :class="activeCategory === 'cat-other' ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
+            :class="activeCategory === 'cat-other' ? 'bg-brand-800 text-white border-brand-800' : 'bg-slate-50 text-slate-400 border-slate-100'"
             class="whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95">
       Other
     </button>
