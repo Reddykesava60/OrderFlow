@@ -237,11 +237,12 @@ class AddOnEditView(OwnerRequiredMixin, View):
                     
             raw_item_ids = request.POST.getlist('item_ids')
             selected_item_ids = list(MenuItem.objects.filter(restaurant=restaurant, id__in=raw_item_ids).values_list('id', flat=True))
-            MenuItemAddOn.objects.filter(addon=addon).delete()
-            MenuItemAddOn.objects.bulk_create([
-                MenuItemAddOn(menu_item_id=item_id, addon=addon)
-                for item_id in selected_item_ids
-            ])
+            with transaction.atomic():
+                MenuItemAddOn.objects.filter(addon=addon).delete()
+                MenuItemAddOn.objects.bulk_create([
+                    MenuItemAddOn(menu_item_id=item_id, addon=addon)
+                    for item_id in selected_item_ids
+                ])
             
             messages.success(request, f"'{addon.name}' updated.")
             return redirect('owner:menu')
