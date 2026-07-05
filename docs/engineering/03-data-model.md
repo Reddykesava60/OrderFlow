@@ -20,10 +20,10 @@ unless noted otherwise.
 
 | Model | What it represents |
 |---|---|
-| `ItemType` | A menu category, scoped per restaurant. |
+| `ItemType` | A menu category, scoped per restaurant. Can be linked to `MenuItem`s directly from the Category edit view. |
 | `MenuItem` | A sellable dish. `stock = NULL` means unlimited; a non-null value is decremented on confirmed orders. `is_available` can be turned off manually or automatically (`auto_hidden_due_to_stock`) when stock hits zero. |
 | `AddOn` | An optional extra (e.g., "extra cheese"), also independently stocked. |
-| `MenuItemAddOn` | The many-to-many link between a `MenuItem` and the `AddOn`s it offers. Its mere existence (with an active add-on) is what marks an item as "has add-ons" in the UI. |
+| `MenuItemAddOn` | The many-to-many link between a `MenuItem` and the `AddOn`s it offers. Its mere existence (with an active add-on) is what marks an item as "has add-ons" in the UI. Can be managed from either the Menu Item or Add-on edit views. |
 | `StaffFilter` | A named subset of menu items, used to scope what a given staff member's KDS view shows. |
 
 ## Orders (`ordering`)
