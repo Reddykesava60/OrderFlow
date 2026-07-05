@@ -85,7 +85,12 @@
   <div x-show="activeSection === 'items'" x-transition class="space-y-6">
     <div class="flex items-center justify-between px-1">
        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Menu Items</h2>
-       <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ items|length }} Items</span>
+       <div class="flex items-center gap-4">
+           <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:inline-block">{{ items|length }} Items</span>
+           <a href="{% url 'owner:menu_add' %}" class="bg-brand-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-100 active:scale-95 transition-all">
+               + Add Item
+           </a>
+       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -223,10 +228,7 @@
     </div>
   </div>
 
-  <!-- Floating Add Button for Mobile -->
-  <a href="{% url 'owner:menu_add' %}" class="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-accent text-white rounded-full flex items-center justify-center shadow-2xl shadow-accent/40 z-50 active:scale-90 transition-all font-black text-2xl">
-    +
-  </a>
+
 
 </div>
 
