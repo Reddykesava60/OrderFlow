@@ -389,7 +389,7 @@
           <span>Kitchen</span>
           <span x-show="counts.kitchen > 0" class="mt-1 rounded-full bg-brand-100 px-2 py-0.5 text-[9px]" x-text="counts.kitchen"></span>
         </button>
-        <button class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
+        <button x-show="kdsPrepEnabled" class="flex flex-1 flex-col items-center rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-tight transition"
                 :class="tab === 'preparing' ? 'bg-brand-50 text-brand-700' : 'text-slate-400'"
                 @click="tab = 'preparing'">
           <span>Prep</span>
