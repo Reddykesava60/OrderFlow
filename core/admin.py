@@ -69,6 +69,8 @@ class RestaurantAdmin(admin.ModelAdmin):
         'owner_count',
         'current_balance',
         'today_revenue',
+        'commission_rate_display',
+        'cash_timeout_display',
         'today_platform_fee',
         'month_platform_fee',
         'created_at',
@@ -139,6 +141,26 @@ class RestaurantAdmin(admin.ModelAdmin):
         ).first()
         total = statement.total_fee_amount if statement else Decimal('0.00')
         return f"₹{total:,.2f}"
+
+    @admin.display(description='Commission')
+    def commission_rate_display(self, obj):
+        if obj.commission_rate is not None:
+            return f"{obj.commission_rate}%"
+        settings = PlatformSettings.get_solo()
+        if settings.platform_fee_mode == PlatformSettings.FeeMode.PERCENTAGE:
+            return f"{settings.platform_fee_percent}% (Default)"
+        return f"₹{settings.platform_fee_fixed_amount} (Default)"
+
+    @admin.display(description='Cash Timeout')
+    def cash_timeout_display(self, obj):
+        try:
+            config = obj.config
+            override = config.cash_payment_timeout_minutes_override
+        except Exception:
+            override = None
+        if override is not None:
+            return f"{override}m"
+        return f"{PlatformSettings.get_solo().cash_payment_timeout_minutes}m (Default)"
 
     @admin.action(description='Deactivate selected restaurants')
     def deactivate_restaurants(self, request, queryset):

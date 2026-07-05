@@ -10,7 +10,7 @@ unless noted otherwise.
 | Model | What it represents |
 |---|---|
 | `Restaurant` | The tenant boundary. Almost every other table links back to one. Has a `slug` (used in customer-facing URLs) and an optional per-restaurant `commission_rate` override. |
-| `RestaurantConfig` | Per-restaurant toggles: is the restaurant currently open, is cash/UPI enabled, has the data processing agreement been accepted, is the KDS preparation stage enabled (`kds_prep_enabled`). |
+| `RestaurantConfig` | Per-restaurant toggles: is the restaurant currently open, is cash/UPI enabled, has the data processing agreement been accepted, is the KDS preparation stage enabled (`kds_prep_enabled`), and an optional per-restaurant `cash_payment_timeout_minutes_override`. |
 | `RestaurantPaymentConfig` | The **legacy**, Razorpay-only per-restaurant payment credential record. Still actively used — see [Payments & Webhooks](./06-payments-and-webhooks.md). |
 | `PlatformSettings` | A singleton row (`singleton_key=1`, enforced in `save()`) holding platform-wide defaults: cash payment timeout, and the default platform fee mode/rate. |
 | `User` | Custom user model (`AUTH_USER_MODEL = 'core.User'`). Has a `role` (`OWNER` or `STAFF`), a `restaurant` FK, and granular permission flags (`allow_cash_collection`, `allow_view_all_orders`, `allow_order_completion`). |
