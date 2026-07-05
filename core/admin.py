@@ -345,8 +345,11 @@ class PlatformSettingsAdmin(admin.ModelAdmin):
         return False
 
     def changelist_view(self, request, extra_context=None):
-        PlatformSettings.get_solo()
-        return super().changelist_view(request, extra_context=extra_context)
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        obj = PlatformSettings.get_solo()
+        url = reverse('admin:core_platformsettings_change', args=[obj.pk])
+        return HttpResponseRedirect(url)
 
 
 class MenuItemAddOnInline(admin.TabularInline):

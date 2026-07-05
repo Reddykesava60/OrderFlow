@@ -60,12 +60,12 @@ Restaurant B's anything.
 
 ## 4. Order lifecycle (kitchen side)
 
-- [ ] **KDS reconnect**: disconnect the kitchen device's network, place an
+- [x] **KDS reconnect**: disconnect the kitchen device's network, place an
   order from a customer device, then reconnect the kitchen device.
   **Expected**: it automatically re-fetches the complete current state and
   the order appears — nothing is permanently missed by a temporary
   disconnect.
-- [ ] **Cancellation releases stock**: cancel an order from the kitchen
+- [x] **Cancellation releases stock**: cancel an order from the kitchen
   side and confirm the held stock returns to the menu immediately
   (visible as the item becoming orderable again if it had hit zero).
 

@@ -179,8 +179,8 @@ class PlatformSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Platform settings'
-        verbose_name_plural = 'Platform settings'
+        verbose_name = 'Platform Settings'
+        verbose_name_plural = 'Platform Settings'
 
     def save(self, *args, **kwargs):
         self.singleton_key = 1
