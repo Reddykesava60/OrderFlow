@@ -136,8 +136,9 @@
 
             <div class="divide-y divide-slate-100">
               <template x-for="unit in order.visible_work_units" :key="unit.id">
-                <div class="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between transition-colors duration-500"
+                <div class="relative flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between transition-colors duration-500"
                      :class="[unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-brand-100', successStates['start-' + unit.kind + '-' + unit.id] ? 'bg-emerald-50/60' : '']">
+                  <span x-show="unit.is_parcel" class="absolute top-4 right-4 text-xl opacity-80" title="Parcel">&#128717;</span>
                   <div class="flex min-w-0 flex-1 gap-4">
                     <div class="h-16 w-16 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                       <template x-if="unit.image_url">
@@ -151,10 +152,6 @@
                       <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-lg font-black text-slate-900" x-text="unit.name"></h2>
                         <span class="text-base font-black text-amber-600" x-text="'x' + unit.qty"></span>
-                        <span x-show="unit.is_parcel" class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
-                          <span aria-hidden="true">&#128717;</span>
-                          Parcel
-                        </span>
                       </div>
                       <div class="mt-1 text-[11px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
                       <div class="mt-3 flex flex-wrap gap-2">
@@ -219,8 +216,9 @@
 
             <div class="divide-y divide-slate-100">
               <template x-for="unit in order.visible_work_units" :key="unit.id">
-                <div class="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between transition-colors duration-500"
+                <div class="relative flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between transition-colors duration-500"
                      :class="[unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-amber-200', successStates['done-' + unit.kind + '-' + unit.id] ? 'bg-emerald-50/60' : '']">
+                  <span x-show="unit.is_parcel" class="absolute top-4 right-4 text-xl opacity-80" title="Parcel">&#128717;</span>
                   <div class="flex min-w-0 flex-1 gap-4">
                     <div class="h-16 w-16 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                       <template x-if="unit.image_url">
@@ -234,10 +232,6 @@
                       <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-lg font-black text-slate-900" x-text="unit.name"></h2>
                         <span class="text-base font-black text-amber-600" x-text="'x' + unit.qty"></span>
-                        <span x-show="unit.is_parcel" class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
-                          <span aria-hidden="true">&#128717;</span>
-                          Parcel
-                        </span>
                       </div>
                       <div class="mt-1 text-[11px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
                       <div class="mt-3 flex flex-wrap gap-2">
@@ -298,7 +292,7 @@
               <template x-for="item in order.items" :key="item.id">
                 <div class="flex items-center justify-between gap-3 text-sm font-bold text-slate-600">
                   <span x-text="item.qty + 'x ' + item.name"></span>
-                  <span x-show="item.is_parcel" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">
+                  <span x-show="item.is_parcel" class="text-lg opacity-80">
                     &#128717;
                   </span>
                 </div>
@@ -353,7 +347,7 @@
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-black text-slate-900" x-text="item.name"></span>
                         <span class="text-sm font-black text-amber-600" x-text="'x' + item.qty"></span>
-                        <span x-show="item.is_parcel" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-rose-600">&#128717; Parcel</span>
+                        <span x-show="item.is_parcel" class="text-lg opacity-80">&#128717;</span>
                       </div>
                       <div class="mt-1 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         <span x-text="item.dining_option_label"></span>
