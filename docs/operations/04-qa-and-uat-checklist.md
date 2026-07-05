@@ -13,34 +13,38 @@ on real webhook delivery timing that's hard to fully simulate locally.
 The worst possible bug in a multi-tenant system is Restaurant A seeing
 Restaurant B's anything.
 
-- [ ] **Cross-tenant ordering**: open Restaurant A's menu, then manually
+- [x] **Cross-tenant ordering**: open Restaurant A's menu, then manually
   change the URL slug to Restaurant B's. Confirm the cart resets/rejects
   rather than letting you check out Restaurant A's items against
   Restaurant B.
-- [ ] **Dashboard isolation**: log in as Restaurant A's owner, then try to
+- [x] **Dashboard isolation**: log in as Restaurant A's owner, then try to
   navigate directly to a Restaurant B record by ID/URL. Confirm you get
   blocked, not a partial or full view of their data.
-- [ ] **KDS isolation**: open Restaurant A's kitchen display, place an
+- [x] **KDS isolation**: open Restaurant A's kitchen display, place an
   order on Restaurant B's menu, and confirm it never appears on
   Restaurant A's screen.
 
+
+
 ## 2. Concurrency and stock locking
 
-- [ ] Set a menu item's stock to exactly `1`. Attempt to check out that
+- [x] Set a menu item's stock to exactly `1`. Attempt to check out that
   item from two different devices at effectively the same instant.
   **Expected**: exactly one succeeds; the other is rejected with a clear
   out-of-stock error *before* being sent to the payment gateway, not
   after being charged.
 
+
+
 ## 3. Webhook and payment resilience
 
-- [ ] **The "dead phone" test**: start a UPI checkout, complete the test
+- [x] **The "dead phone" test**: start a UPI checkout, complete the test
   payment successfully in Razorpay's flow, and **immediately** close the
   browser tab before being redirected back. **Expected**: the order still
   gets confirmed and appears in the kitchen — driven entirely by the
   server-to-server webhook, with no dependency on the customer's browser
   surviving the transaction.
-- [ ] **Idempotent redelivery**: from the Razorpay dashboard, manually
+- [x] **Idempotent redelivery**: from the Razorpay dashboard, manually
   resend a successful webhook event several times in a row. **Expected**:
   only the first delivery has any effect; subsequent ones are recognized
   as duplicates and are no-ops (no double-counted revenue, no duplicate
@@ -52,6 +56,8 @@ Restaurant B's anything.
   [Order & Payment Lifecycle](../engineering/04-order-and-payment-lifecycle.md)
   rather than staying incorrectly cancelled.
 
+
+
 ## 4. Order lifecycle (kitchen side)
 
 - [ ] **KDS reconnect**: disconnect the kitchen device's network, place an
@@ -62,6 +68,8 @@ Restaurant B's anything.
 - [ ] **Cancellation releases stock**: cancel an order from the kitchen
   side and confirm the held stock returns to the menu immediately
   (visible as the item becoming orderable again if it had hit zero).
+
+
 
 ## 5. Expiration behavior
 
@@ -77,6 +85,8 @@ Restaurant B's anything.
   adjustable per platform) the order auto-cancels and stock is restored.
   Don't assume this matches the UPI window — they're independently
   configured.
+
+
 
 ## 6. Financial reconciliation
 
@@ -95,6 +105,8 @@ always tie out exactly.
 - [ ] If you test a refund, confirm the reversing entries appear (don't
   expect the original entry to be edited or deleted — see
   [Financial Ledger](../engineering/05-financial-ledger.md#refunds-the-reversing-entry-pattern-applied-consistently)).
+
+
 
 ## How to actually run this
 

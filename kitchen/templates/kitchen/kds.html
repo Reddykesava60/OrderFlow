@@ -657,6 +657,7 @@
             });
             this.allOrders = data.all_orders || [];
             this.counts = data.tab_counts || this.counts;
+            this.counts.payments = this.payments.length;
             this.canComplete = !!data.permissions.can_complete;
             this.canCollect = !!data.permissions.can_collect;
             this.canViewAll = !!data.permissions.can_view_all;
