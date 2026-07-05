@@ -73,13 +73,13 @@ Restaurant B's anything.
 
 ## 5. Expiration behavior
 
-- [ ] **Abandoned UPI checkout**: start checkout, reach the Razorpay
+- [x] **Abandoned UPI checkout**: start checkout, reach the Razorpay
   screen, then simply abandon it without paying. **Expected**: after the
   payment's expiry window (15 minutes by default —
   see `expire_pending_payments_task` in
   [Background Jobs](../engineering/08-background-jobs.md)), the
   transaction expires and any reserved stock is released.
-- [ ] **Abandoned cash order**: create a cash order and never confirm
+- [x] **Abandoned cash order**: create a cash order and never confirm
   payment at the counter. **Expected**: after the configured cash timeout
   (10 minutes by default — `PlatformSettings.cash_payment_timeout_minutes`,
   adjustable per platform) the order auto-cancels and stock is restored.
