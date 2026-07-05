@@ -47,4 +47,22 @@ class OwnerOrderReceiptView(OwnerRequiredMixin, View):
         restaurant = self.get_restaurant()
         expire_overdue_unpaid_cash_orders(restaurant=restaurant)
         order = get_object_or_404(Order.objects.select_related('restaurant').prefetch_related('items__addons'), id=order_id, restaurant=restaurant)
-        return render(request, 'owner/order_receipt.html', {'restaurant': restaurant, 'order': order})
+        
+        fee_record = order.fee_records.first()
+        context = {
+            'restaurant': restaurant,
+            'order': order,
+            'fee_record': fee_record,
+            'is_owner': True,
+        }
+
+        if order.payment_method == Order.PaymentMethod.CASH and order.status == Order.Status.UNPAID:
+            context['cash_timeout_minutes'] = get_cash_payment_timeout_minutes(restaurant)
+            
+        if order.payment_method == Order.PaymentMethod.POST_PAYMENT:
+            ledger_entry = order.ledger_entries.first()
+            context['ledger_entry'] = ledger_entry
+            if ledger_entry:
+                context['prev_balance'] = ledger_entry.balance_after - ledger_entry.amount
+
+        return render(request, 'ordering/receipt_v2.html', context)
