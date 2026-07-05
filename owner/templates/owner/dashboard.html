@@ -2,7 +2,28 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
+<div class="space-y-8 max-w-5xl mx-auto" x-data="{ activeSection: 'overview' }">
+
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Dashboard</h1>
+      <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">Overview & Analytics</p>
+    </div>
+    <div class="flex items-center bg-white p-1 rounded-2xl border border-slate-200 shadow-sm self-start">
+       <button @click="activeSection = 'overview'" 
+               :class="activeSection === 'overview' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Overview</button>
+       <button @click="activeSection = 'sales'" 
+               :class="activeSection === 'sales' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Sales</button>
+       <button @click="activeSection = 'orders'" 
+               :class="activeSection === 'orders' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Orders</button>
+    </div>
+  </div>
+
+  <div x-show="activeSection === 'overview'" x-transition class="space-y-8">
   <!-- Ledger Balance -->
   <div class="bg-slate-900 rounded-[2rem] p-6 sm:p-8 text-white shadow-xl shadow-slate-200 relative overflow-hidden">
     <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
@@ -97,8 +118,10 @@
       </div>
     </div>
   </div>
+  </div> <!-- end of overview -->
 
-
+  <!-- Sales Section -->
+  <div x-show="activeSection === 'sales'" x-transition class="space-y-8">
   <section>
     <div class="mb-4">
       <h2 class="text-xl font-black text-slate-900">Items sold today</h2>
@@ -167,7 +190,10 @@
       {% endfor %}
     </div>
   </section>
+  </div> <!-- end of sales -->
 
+  <!-- Orders Section -->
+  <div x-show="activeSection === 'orders'" x-transition class="space-y-8">
   <section>
     <div class="mb-4 flex items-center justify-between gap-3">
       <div>
@@ -202,5 +228,6 @@
       {% endfor %}
     </div>
   </section>
+  </div> <!-- end of orders -->
 </div>
 {% endblock %}
