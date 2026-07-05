@@ -395,7 +395,7 @@ class KDSPollView(ActiveStaffMixin, View):
 
         payload = {
             "server_time": timezone.now().isoformat(),
-            "cash_timeout_minutes": get_cash_payment_timeout_minutes(),
+            "cash_timeout_minutes": get_cash_payment_timeout_minutes(restaurant),
             "staff_filters": staff_filters,
             "kitchen": kitchen_data,
             "preparing": preparing_data,

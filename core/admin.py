@@ -25,7 +25,7 @@ class RestaurantConfigInline(admin.StackedInline):
     model = RestaurantConfig
     can_delete = False
     verbose_name_plural = 'Restaurant config'
-    fields = ('is_open', 'reopen_message', 'cash_enabled', 'upi_enabled', 'kds_prep_enabled')
+    fields = ('is_open', 'reopen_message', 'cash_enabled', 'upi_enabled', 'kds_prep_enabled', 'cash_payment_timeout_minutes_override')
 
 
 class RestaurantPaymentConfigInline(admin.StackedInline):
@@ -345,11 +345,8 @@ class PlatformSettingsAdmin(admin.ModelAdmin):
         return False
 
     def changelist_view(self, request, extra_context=None):
-        from django.http import HttpResponseRedirect
-        from django.urls import reverse
-        obj = PlatformSettings.get_solo()
-        url = reverse('admin:core_platformsettings_change', args=[obj.pk])
-        return HttpResponseRedirect(url)
+        PlatformSettings.get_solo()
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 class MenuItemAddOnInline(admin.TabularInline):

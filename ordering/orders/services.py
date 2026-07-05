@@ -59,7 +59,9 @@ def _next_order_number(restaurant):
     counter.save(update_fields=['last_number', 'last_reset'])
     return counter.last_number
 
-def get_cash_payment_timeout_minutes():
+def get_cash_payment_timeout_minutes(restaurant=None):
+    if restaurant and hasattr(restaurant, 'config') and restaurant.config.cash_payment_timeout_minutes_override is not None:
+        return restaurant.config.cash_payment_timeout_minutes_override
     return PlatformSettings.get_solo().cash_payment_timeout_minutes
 
 def _expire_unpaid_cash_order_locked(order):
@@ -90,18 +92,20 @@ def expire_overdue_unpaid_cash_orders(restaurant=None):
     Optionally scope to a single restaurant.
     Returns number of orders expired.
     """
-    timeout_minutes = get_cash_payment_timeout_minutes()
-    cutoff = timezone.now() - timezone.timedelta(minutes=timeout_minutes)
-    overdue_orders = Order.objects.filter(payment_method=Order.PaymentMethod.CASH, status=Order.Status.UNPAID, created_at__lt=cutoff).select_related('restaurant').order_by('created_at')
+    overdue_orders_query = Order.objects.filter(payment_method=Order.PaymentMethod.CASH, status=Order.Status.UNPAID).select_related('restaurant', 'restaurant__config').order_by('created_at')
     if restaurant is not None:
-        overdue_orders = overdue_orders.filter(restaurant=restaurant)
+        overdue_orders_query = overdue_orders_query.filter(restaurant=restaurant)
+        
     expired_count = 0
-    for order in overdue_orders:
-        try:
-            if expire_unpaid_cash_order(order):
-                expired_count += 1
-        except Exception:
-            logger.exception('Error expiring overdue cash order %s', order.pk)
+    now = timezone.now()
+    for order in overdue_orders_query:
+        timeout = get_cash_payment_timeout_minutes(order.restaurant)
+        if order.created_at < now - timezone.timedelta(minutes=timeout):
+            try:
+                if expire_unpaid_cash_order(order):
+                    expired_count += 1
+            except Exception:
+                logger.exception('Error expiring overdue cash order %s', order.pk)
     return expired_count
 
 def sync_order_status(order):

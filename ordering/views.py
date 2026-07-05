@@ -362,7 +362,7 @@ class ReceiptView(View):
         }
 
         if order.payment_method == Order.PaymentMethod.CASH and order.status == Order.Status.UNPAID:
-            context['cash_timeout_minutes'] = get_cash_payment_timeout_minutes()
+            context['cash_timeout_minutes'] = get_cash_payment_timeout_minutes(restaurant)
             
         if order.payment_method == Order.PaymentMethod.POST_PAYMENT:
             ledger_entry = order.ledger_entries.first()

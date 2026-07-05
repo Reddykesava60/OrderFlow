@@ -51,10 +51,9 @@ class Command(BaseCommand):
             except Exception:
                 logger.exception("Error releasing reservations for order %s", order.pk)
 
-        cash_timeout_minutes = get_cash_payment_timeout_minutes()
         expired_cash = expire_overdue_unpaid_cash_orders()
 
         self.stdout.write(
             f"Released {released} expired UPI order(s). "
-            f"Expired {expired_cash} unpaid cash order(s) after {cash_timeout_minutes} minute(s)."
+            f"Expired {expired_cash} unpaid cash order(s)."
         )

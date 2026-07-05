@@ -57,6 +57,10 @@ class RestaurantConfig(models.Model):
         default=True,
         help_text='When off, tapping Start in the KDS marks items complete immediately — no separate preparing step.',
     )
+    cash_payment_timeout_minutes_override = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Per-restaurant cash timeout override (minutes). NULL = use PlatformSettings default.',
+    )
     dpa_accepted_at = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -179,8 +183,8 @@ class PlatformSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Platform Settings'
-        verbose_name_plural = 'Platform Settings'
+        verbose_name = 'Platform settings'
+        verbose_name_plural = 'Platform settings'
 
     def save(self, *args, **kwargs):
         self.singleton_key = 1
