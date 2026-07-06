@@ -242,7 +242,7 @@ class User(AbstractUser):
     allow_view_all_orders  = models.BooleanField(default=False)
     allow_order_completion = models.BooleanField(default=False)
     must_change_password   = models.BooleanField(default=False)
-    mfa_enabled            = models.BooleanField(default=True, help_text="Require Two-Factor Authentication for this user.")
+    mfa_enabled            = models.BooleanField(default=False, help_text="Require Two-Factor Authentication for this user.")
     photo                  = models.TextField(blank=True)  # Supabase Storage URL (prefer signed URL if private later)
 
 
