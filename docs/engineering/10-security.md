@@ -19,7 +19,7 @@ paper than it is in practice.
   happens in a dedicated 2-step verification flow after standard username/password login.
   Both `ActiveStaffMixin` (which covers both owners and staff) and `AdminMfaMiddleware` gate on
   `user.mfa_enabled` before checking `is_verified()`, so users with MFA
-  disabled bypass the verification redirect entirely.
+  disabled bypass the verification redirect entirely (MFA is disabled by default for all new accounts).
 - **Customers** (for the post-payment/tab feature) authenticate with a
   restaurant-scoped serial number + PIN, not a password. PINs are hashed
   with a dedicated hasher (`core.hashers.CustomerPINHasher`, PBKDF2 with
