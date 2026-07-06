@@ -17,7 +17,7 @@
   <form method="post" action="{% url 'owner:category_edit' category.id %}" class="space-y-6">
     {% csrf_token %}
     
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <div>
           <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Category Name *</label>
           <input type="text" name="name" value="{{ category.name }}" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all mt-2">
@@ -25,7 +25,7 @@
     </div>
 
     <!-- Linked Items Section -->
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <div>
           <h2 class="text-sm font-black text-slate-800 uppercase tracking-widest">Linked Items</h2>
           <p class="text-[10px] font-bold text-slate-400 mt-0.5">Select menu items to include in this category</p>
@@ -45,7 +45,7 @@
        </div>
     </div>
 
-    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 active:scale-95 transition-all">
+    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] active:scale-95 transition-all">
        Update Category
     </button>
   </form>

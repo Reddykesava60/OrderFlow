@@ -25,14 +25,14 @@
 
 <!-- Global Navigation Loader -->
 <div id="global-page-loader" class="fixed inset-0 bg-slate-50/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200" style="display: none;">
-  <div class="bg-white p-6 rounded-3xl shadow-2xl shadow-brand-900/10 flex flex-col items-center gap-4 border border-brand-100">
+  <div class="bg-white p-6 rounded-3xl flex flex-col items-center gap-4 border border-brand-100">
     <svg class="w-8 h-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
     <span class="text-sm font-black text-brand-800 tracking-wide">Loading...</span>
   </div>
 </div>
 
 <!-- Desktop Navigation -->
-<nav class="hidden md:flex bg-brand-800 text-white px-6 py-0 items-stretch gap-1 sticky top-0 z-50 shadow-md">
+<nav class="hidden md:flex bg-brand-800 text-white px-6 py-0 items-stretch gap-1 sticky top-0 z-50">
   <a class="flex items-center font-extrabold text-lg mr-6" href="{% url 'owner:dashboard' %}">{{ APP_NAME }}</a>
   
   {% with url_name=request.resolver_match.url_name %}
@@ -58,7 +58,7 @@
 </nav>
 
 <!-- Mobile Header -->
-<header class="md:hidden bg-brand-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+<header class="md:hidden bg-brand-800 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 border-b border-white/10">
   <span class="font-extrabold text-base">{{ APP_NAME }}</span>
   <div class="flex items-center gap-3">
     <a href="{% url 'kitchen:kds' %}" class="text-[10px] bg-white/10 px-2 py-1 rounded-full font-bold">KDS</a>
@@ -87,7 +87,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0 scale-100"
          x-transition:leave-end="opacity-0 -translate-y-1 scale-95"
-         class="pointer-events-auto w-full max-w-sm flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold shadow-lg border backdrop-blur-sm"
+         class="pointer-events-auto w-full max-w-sm flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold border backdrop-blur-sm"
          :class="toast.type === 'success'
            ? 'bg-white/95 border-emerald-200 text-emerald-800'
            : toast.type === 'error'
@@ -139,7 +139,7 @@
 </script>
 
 <!-- Bottom Navigation (Mobile Only) -->
-<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-2 py-1 z-50 safe-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.05)] overflow-x-auto">
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-1 z-50 safe-bottom overflow-x-auto">
   <div class="grid grid-cols-6 gap-1 min-w-[300px]">
     {% with url_name=request.resolver_match.url_name %}
     <a href="{% url 'owner:dashboard' %}" class="flex flex-col items-center justify-center py-2 rounded-xl transition-all {% if url_name == 'dashboard' %}text-brand-600 bg-brand-50{% else %}text-slate-400{% endif %}">

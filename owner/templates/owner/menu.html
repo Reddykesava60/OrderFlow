@@ -11,15 +11,15 @@
       <h1 class="text-2xl font-black text-slate-900 tracking-tight">Menu Management</h1>
       <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">Inventory & Availability</p>
     </div>
-    <div class="flex items-center bg-white p-1 rounded-2xl border border-slate-200 shadow-sm self-start">
+    <div class="flex items-center bg-white p-1 rounded-2xl border border-slate-200 self-start">
        <button @click="activeSection = 'items'" 
-               :class="activeSection === 'items' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               :class="activeSection === 'items' ? 'bg-brand-800 text-white' : 'text-slate-400 hover:text-slate-600'"
                class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Items</button>
        <button @click="activeSection = 'addons'" 
-               :class="activeSection === 'addons' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               :class="activeSection === 'addons' ? 'bg-brand-800 text-white' : 'text-slate-400 hover:text-slate-600'"
                class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Add-ons</button>
        <button @click="activeSection = 'config'" 
-               :class="activeSection === 'config' ? 'bg-brand-800 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'"
+               :class="activeSection === 'config' ? 'bg-brand-800 text-white' : 'text-slate-400 hover:text-slate-600'"
                class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Setup</button>
     </div>
   </div>
@@ -28,7 +28,7 @@
   <div x-show="activeSection === 'config'" x-transition class="space-y-6">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
        <!-- Staff Filters Card -->
-       <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
           <div class="flex items-center gap-3">
              <div class="w-10 h-10 bg-brand-100 text-brand-700 rounded-2xl flex items-center justify-center">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
@@ -41,11 +41,11 @@
           <p class="text-xs font-medium text-slate-500 leading-relaxed">
             Organize items into station-specific views (e.g. Bar, Hot Kitchen) for your staff members.
           </p>
-          <a href="{% url 'owner:staff_filters' %}" class="inline-block bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 active:scale-95 transition-all">Manage Filters</a>
+          <a href="{% url 'owner:staff_filters' %}" class="inline-block bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Manage Filters</a>
        </div>
 
        <!-- Category Quick Add -->
-       <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+       <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
           <div class="flex items-center gap-3">
              <div class="w-10 h-10 bg-brand-100 text-brand-700 rounded-2xl flex items-center justify-center text-lg">📁</div>
              <div>
@@ -70,7 +70,7 @@
                 {% for category in item_types %}
                 <div class="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50 hover:border-brand-200 transition-all">
                    <span class="text-sm font-bold text-slate-800 ml-2">{{ category.name }}</span>
-                   <a href="{% url 'owner:category_edit' category.id %}" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-brand-700 hover:border-brand-200 transition-all shadow-sm">Edit</a>
+                   <a href="{% url 'owner:category_edit' category.id %}" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-brand-700 hover:border-brand-200 transition-all">Edit</a>
                 </div>
                 {% empty %}
                 <div class="p-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest rounded-2xl border border-dashed border-slate-200">No categories found</div>
@@ -87,7 +87,7 @@
        <h2 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Menu Items</h2>
        <div class="flex items-center gap-4">
            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:inline-block">{{ items|length }} Items</span>
-           <a href="{% url 'owner:menu_add' %}" class="bg-brand-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-100 active:scale-95 transition-all">
+           <a href="{% url 'owner:menu_add' %}" class="bg-brand-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">
                + Add Item
            </a>
        </div>
@@ -95,7 +95,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
        {% for item in items %}
-       <div class="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between transition-all hover:border-brand-200 hover:shadow-xl hover:shadow-slate-100 group" 
+       <div class="bg-white p-5 rounded-[2rem] border border-slate-100 flex flex-col justify-between transition-all hover:border-brand-200 group" 
             id="item-{{ item.id }}" 
             style="{% if not item.is_available %}opacity:.65{% endif %}">
           
@@ -157,7 +157,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
        {% for addon in addons %}
-       <div class="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between transition-all hover:border-brand-200 group"
+       <div class="bg-white p-5 rounded-[2rem] border border-slate-100 flex flex-col justify-between transition-all hover:border-brand-200 group"
             style="{% if not addon.is_active %}opacity:.65{% endif %}">
           <div class="flex gap-4 items-start">
              <div class="w-16 h-16 rounded-2xl bg-slate-50 overflow-hidden border border-slate-100 shrink-0">
@@ -196,11 +196,11 @@
        <!-- Create Add-on Card -->
        <div class="bg-slate-50 p-5 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 text-center group cursor-pointer hover:bg-slate-100 transition-all"
             x-data="{ showForm: false }" @click="showForm = !showForm">
-          <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl text-slate-400 group-hover:text-brand-800 transition-all shadow-sm">+</div>
+          <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl text-slate-400 group-hover:text-brand-800 transition-all">+</div>
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-brand-800 transition-all">New Add-on</p>
           
           <!-- Dropdown Form -->
-          <div x-show="showForm" @click.stop class="w-full bg-white p-6 rounded-[2rem] shadow-2xl border border-slate-100 mt-2 text-left space-y-4" x-transition>
+          <div x-show="showForm" @click.stop class="w-full bg-white p-6 rounded-[2rem] border border-slate-100 mt-2 text-left space-y-4" x-transition>
              <form method="post" enctype="multipart/form-data" action="{% url 'owner:addon_add' %}" class="space-y-4">
                 {% csrf_token %}
                 <div class="space-y-2">
@@ -221,7 +221,7 @@
                    <label class="text-[9px] font-black text-slate-400 uppercase">Image</label>
                    <input type="file" name="image" accept="image/*" class="w-full text-[10px] text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200">
                 </div>
-                <button type="submit" class="w-full bg-brand-800 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-100 active:scale-95 transition-all">Create Add-on</button>
+                <button type="submit" class="w-full bg-brand-800 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all">Create Add-on</button>
              </form>
           </div>
        </div>

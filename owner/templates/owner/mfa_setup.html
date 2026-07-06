@@ -14,13 +14,13 @@
 <body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex items-center justify-center p-6">
   <!-- Global Loader for Form Submission -->
   <div id="global-page-loader" class="fixed inset-0 bg-slate-50/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200" style="display: none;">
-    <div class="bg-white p-6 rounded-3xl shadow-2xl shadow-brand-900/10 flex flex-col items-center gap-4 border border-brand-100">
+    <div class="bg-white p-6 rounded-3xl flex flex-col items-center gap-4 border border-brand-100">
       <svg class="w-8 h-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
       <span class="text-sm font-black text-brand-800 tracking-wide">Loading...</span>
     </div>
   </div>
   <div class="w-full max-w-sm space-y-8">
-    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100 space-y-6">
+    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 space-y-6">
       <div>
         <h2 class="text-xl font-black text-slate-900 tracking-tight">Setup Two-Factor Auth</h2>
         <p class="text-xs font-medium text-slate-400 mt-1">Scan the QR code with an authenticator app (like Google Authenticator or Authy) to secure your account.</p>
@@ -35,7 +35,7 @@
       {% endif %}
 
       <div class="flex justify-center bg-slate-50 rounded-2xl p-4">
-        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="w-48 h-48 rounded-xl shadow-sm border border-slate-200">
+        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="w-48 h-48 rounded-xl border border-slate-200">
       </div>
       <p class="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ secret }}</p>
 
@@ -47,7 +47,7 @@
                   class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-bold focus:border-brand-300 outline-none transition-all placeholder:text-slate-300 text-center tracking-[0.5em]"
                   placeholder="000000" maxlength="6">
         </div>
-        <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all mt-4">
+        <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] hover:bg-brand-900 active:scale-95 transition-all mt-4">
           Verify & Enable
         </button>
         <a href="{% url 'landing' %}" class="block text-center w-full bg-slate-100 text-slate-600 py-4 rounded-3xl font-black uppercase tracking-[0.1em] hover:bg-slate-200 active:scale-95 transition-all mt-3">

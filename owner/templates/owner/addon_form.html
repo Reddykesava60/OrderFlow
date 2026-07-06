@@ -11,7 +11,7 @@
       <h1 class="text-2xl font-black text-slate-900 tracking-tight">Edit Add-on</h1>
       <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">{{ addon.name }}</p>
     </div>
-    <a href="{% url 'owner:menu' %}" class="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:text-slate-600 transition-all shadow-sm">
+    <a href="{% url 'owner:menu' %}" class="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:text-slate-600 transition-all">
        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
     </a>
   </div>
@@ -19,7 +19,7 @@
   <form method="post" enctype="multipart/form-data" class="space-y-6">
     {% csrf_token %}
 
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Add-on Details</h2>
        
        <div class="flex flex-col md:flex-row items-center gap-8 border-b border-slate-50 pb-8">
@@ -64,7 +64,7 @@
     </div>
 
     <!-- Linked Items Section -->
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <div>
           <h2 class="text-sm font-black text-slate-800 uppercase tracking-widest">Linked Items</h2>
           <p class="text-[10px] font-bold text-slate-400 mt-0.5">Select menu items that can include this add-on</p>
@@ -84,7 +84,7 @@
        </div>
     </div>
 
-    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 active:scale-95 transition-all">
+    <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] active:scale-95 transition-all">
        Update Add-on
     </button>
   </form>

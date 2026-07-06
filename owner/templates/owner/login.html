@@ -22,19 +22,19 @@
 
   <!-- Global Loader for Form Submission -->
   <div id="global-page-loader" class="fixed inset-0 bg-slate-50/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200" style="display: none;">
-    <div class="bg-white p-6 rounded-3xl shadow-2xl shadow-brand-900/10 flex flex-col items-center gap-4 border border-brand-100">
+    <div class="bg-white p-6 rounded-3xl flex flex-col items-center gap-4 border border-brand-100">
       <svg class="w-8 h-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
       <span class="text-sm font-black text-brand-800 tracking-wide">Loading...</span>
     </div>
   </div>
   <div class="w-full max-w-sm space-y-8">
     <div class="text-center space-y-2">
-       <div class="inline-flex items-center justify-center w-16 h-16 bg-brand-800 text-white rounded-3xl shadow-2xl shadow-brand-200 text-2xl font-black mb-4">{{ APP_SHORT_NAME }}</div>
+       <div class="inline-flex items-center justify-center w-16 h-16 bg-brand-800 text-white rounded-3xl text-2xl font-black mb-4">{{ APP_SHORT_NAME }}</div>
        <h1 class="text-4xl font-black text-brand-900 tracking-tighter">{{ APP_NAME }}</h1>
        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ APP_TAGLINE }}</p>
     </div>
 
-    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100 space-y-6">
+    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 space-y-6">
       <div>
         <h2 class="text-xl font-black text-slate-900 tracking-tight">Sign In</h2>
         <p class="text-xs font-medium text-slate-400 mt-1">Access your restaurant dashboard</p>
@@ -64,7 +64,7 @@
 
         <input type="hidden" name="next" value="{{ next }}">
 
-        <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all mt-4">
+        <button type="submit" class="w-full bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] hover:bg-brand-900 active:scale-95 transition-all mt-4">
           Authenticate
         </button>
       </form>

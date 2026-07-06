@@ -11,7 +11,7 @@
       <h1 class="text-2xl font-black text-slate-900 tracking-tight">{% if item %}Edit Item{% else %}New Menu Item{% endif %}</h1>
       <p class="text-sm font-medium text-slate-400 mt-1 uppercase tracking-widest">{% if item %}{{ item.name }}{% else %}Add to Inventory{% endif %}</p>
     </div>
-    <a href="{% url 'owner:menu' %}" class="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:text-slate-600 transition-all shadow-sm">
+    <a href="{% url 'owner:menu' %}" class="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:text-slate-600 transition-all">
        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
     </a>
   </div>
@@ -20,7 +20,7 @@
     {% csrf_token %}
 
     <!-- Image Upload Card -->
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Media</h2>
        
        <div class="flex flex-col md:flex-row items-center gap-8">
@@ -50,7 +50,7 @@
     </div>
 
     <!-- Details Card -->
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Basic Information</h2>
        
        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Configuration Card -->
-    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
+    <div class="bg-white p-8 rounded-[2rem] border border-slate-100 space-y-6">
        <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Advanced Setup</h2>
        
        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -128,11 +128,11 @@
     </div>
 
     <div class="pt-4 flex items-center gap-4">
-       <button type="submit" class="flex-1 bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-brand-100 hover:bg-brand-900 active:scale-95 transition-all">
+       <button type="submit" class="flex-1 bg-brand-800 text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] hover:bg-brand-900 active:scale-95 transition-all">
           Save Item
        </button>
        {% if item %}
-       <a href="{% url 'owner:menu_delete' item.id %}" onclick="return confirm('Delete this item?')" class="p-5 bg-rose-50 text-rose-500 rounded-3xl hover:bg-rose-100 transition-all shadow-sm">
+       <a href="{% url 'owner:menu_delete' item.id %}" onclick="return confirm('Delete this item?')" class="p-5 bg-rose-50 text-rose-500 rounded-3xl hover:bg-rose-100 transition-all">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
        </a>
        {% endif %}
