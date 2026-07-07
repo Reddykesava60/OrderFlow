@@ -145,11 +145,13 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         title_font   = _find_font(['arialbd.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf'], 42)
         subtitle_font = _find_font(['arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf'], 28)
         caption_font  = _find_font(['arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf'], 18)
+        footer_font   = _find_font(['arialbd.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf'], 14)
 
         # ── Measure text ─────────────────────────────────────────────────
         title_text = restaurant.name
         subtitle_text = "Scan to Order"
         caption_text = "Point your phone camera at the code"
+        footer_text = "POWERED BY ORDER-FLOW"
 
         dummy = ImageDraw.Draw(Image.new('RGB', (1, 1)))
         title_bbox = dummy.textbbox((0, 0), title_text, font=title_font)
@@ -164,16 +166,23 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         caption_w = caption_bbox[2] - caption_bbox[0]
         caption_h = caption_bbox[3] - caption_bbox[1]
 
+        footer_bbox = dummy.textbbox((0, 0), footer_text, font=footer_font)
+        footer_w = footer_bbox[2] - footer_bbox[0]
+        footer_h = footer_bbox[3] - footer_bbox[1]
+
         # ── Compose final image ──────────────────────────────────────────
         padding = 48
         gap = 24
         line_gap = 16          # space around the separator line
         caption_gap = 10       # space between subtitle and caption
-        canvas_w = max(qr_w, title_w, subtitle_w, caption_w) + padding * 2
+        footer_gap = 32
+        
+        canvas_w = max(qr_w, title_w, subtitle_w, caption_w, footer_w) + padding * 2
         canvas_h = (padding + title_h + gap
                     + qr_h
                     + line_gap + 1 + line_gap   # separator line (1px)
                     + subtitle_h + caption_gap + caption_h
+                    + footer_gap + footer_h
                     + padding)
 
         canvas = Image.new('RGB', (canvas_w, canvas_h), 'white')
@@ -182,7 +191,7 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         # Restaurant name (centred above QR)
         title_x = (canvas_w - title_w) // 2
         title_y = padding
-        draw.text((title_x, title_y), title_text, fill='#111111', font=title_font)
+        draw.text((title_x, title_y), title_text, fill='#005aa3', font=title_font)
 
         # QR code (centred)
         qr_x = (canvas_w - qr_w) // 2
@@ -203,6 +212,11 @@ class MenuQrCodeDownloadView(OwnerRequiredMixin, View):
         caption_x = (canvas_w - caption_w) // 2
         caption_y = subtitle_y + subtitle_h + caption_gap
         draw.text((caption_x, caption_y), caption_text, fill='#999999', font=caption_font)
+
+        # Footer (centred, bottom)
+        footer_x = (canvas_w - footer_w) // 2
+        footer_y = caption_y + caption_h + footer_gap
+        draw.text((footer_x, footer_y), footer_text, fill='#AAAAAA', font=footer_font)
 
         # ── Save to bytes ────────────────────────────────────────────────
         buf = io.BytesIO()
