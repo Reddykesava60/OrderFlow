@@ -137,6 +137,7 @@ class MenuView(View):
         })
 
 
+@method_decorator(rate_limit('menu', limit=60, window=60), name='dispatch')
 class MenuByIdView(View):
     """
     GET /r/menu/{restaurant_id}/

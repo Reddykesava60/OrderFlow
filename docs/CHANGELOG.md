@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
   - Adjusted individual KDS item action buttons (e.g., "Mark Done") to float on the right side of their respective rows, visually separating them from the "Complete All" order-level buttons.
   - Simplified the spice level display across the KDS to show only pepper icons (🌶️) instead of redundant text labels.
   - Standardized the order number badge styling across all KDS screens for visual consistency.
-- **Admin Dashboard**: Ensured bulk actions in the Django admin panel (`RestaurantAdmin`) use clear "Deactivate selected restaurants" and "Activate selected restaurants" terminology. Deactivating a restaurant immediately shuts down its public menu and business operations.
+- **Admin Dashboard**: Ensured bulk actions in the Django admin panel (`RestaurantAdmin`) use clear "Deactivate " and "Activate" terminology. Deactivating a restaurant immediately shuts down its public menu and business operations.
 
 ### Security
 - **Receipt Rate Limiting**: Applied a strict rate limit of 30 requests per minute to the `ReceiptView` to prevent bot scraping and brute-force traffic, matching the security parameters of the checkout flow.

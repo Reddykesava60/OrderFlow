@@ -10,9 +10,22 @@ logger = logging.getLogger(__name__)
 
 
 def client_ip(request):
+    """
+    Extract the real client IP from the request.
+
+    Priority:
+      1. X-Real-IP — set by our Nginx/Railway proxy to the actual remote address.
+      2. First entry in X-Forwarded-For — the client IP added by the outermost
+         trusted proxy.  Previous code used the LAST entry which allowed attackers
+         to inject arbitrary IPs and bypass rate limiting.
+      3. REMOTE_ADDR — direct connection (no proxy).
+    """
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    if real_ip:
+        return real_ip
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded_for:
-        return forwarded_for.split(",")[-1].strip()
+        return forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "unknown")
 
 

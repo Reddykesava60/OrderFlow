@@ -1,19 +1,31 @@
 # kitchen/consumers.py
 import json
+import time
 from channels.generic.websocket import AsyncWebsocketConsumer
+
+# Per-connection message throttle: max messages within a sliding window
+WS_THROTTLE_MAX_MESSAGES = 30
+WS_THROTTLE_WINDOW_SECONDS = 10
+
 
 class KDSWebsocketConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
         
-        # Must be authenticated and either STAFF or OWNER
-        if not user.is_authenticated or user.role not in ['STAFF', 'OWNER']:
+        # Must be authenticated, active, and either STAFF or OWNER
+        if not user.is_authenticated or not getattr(user, 'is_active', False):
+            await self.close()
+            return
+        if user.role not in ['STAFF', 'OWNER']:
             await self.close()
             return
             
         if not user.restaurant_id:
             await self.close()
             return
+
+        # Per-connection message timestamps for throttling
+        self._message_timestamps = []
 
         # Join restaurant-specific KDS group
         self.restaurant_id = str(user.restaurant_id)
@@ -51,7 +63,22 @@ class KDSWebsocketConsumer(AsyncWebsocketConsumer):
         }))
         await self.close()
 
+    def _is_throttled(self):
+        """Simple sliding-window per-connection message throttle."""
+        now = time.monotonic()
+        cutoff = now - WS_THROTTLE_WINDOW_SECONDS
+        self._message_timestamps = [
+            ts for ts in self._message_timestamps if ts > cutoff
+        ]
+        if len(self._message_timestamps) >= WS_THROTTLE_MAX_MESSAGES:
+            return True
+        self._message_timestamps.append(now)
+        return False
+
     async def receive(self, text_data):
+        if self._is_throttled():
+            await self.close(code=4029)
+            return
         try:
             data = json.loads(text_data)
             if data.get("action") == "ping":

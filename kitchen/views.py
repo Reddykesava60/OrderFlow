@@ -474,21 +474,12 @@ class KDSPollView(ActiveStaffMixin, View):
                     _incr_metric("kds_metrics_stale_served")
                     master_payload = stale_payload
                 else:
-                    # Rare: Stale is gone. Enter short retry backoff up to 350ms total
-                    for delay in [0.05, 0.1, 0.2]:
-                        time.sleep(delay)
-                        cached_payload = cache.get(cache_key)
-                        if cached_payload:
-                            break
-                            
-                    if cached_payload:
-                        logger.info("metric kds_cache_hit 1 restaurant_id=%s", restaurant.id)
-                        _incr_metric("kds_metrics_cache_hits")
-                        master_payload = cached_payload
-                    else:
-                        # Desperation fallback
-                        master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
-                        cache.set(cache_key, master_payload, timeout=300)
+                    # Rare: Stale cache is gone and lock is held by another
+                    # request.  Previous code used time.sleep() retries which
+                    # blocked the Daphne worker thread and could exhaust the
+                    # pool under load.  Just rebuild the payload directly.
+                    master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
+                    cache.set(cache_key, master_payload, timeout=300)
 
         # Apply User Permissions Filter
         response_payload = master_payload.copy()
