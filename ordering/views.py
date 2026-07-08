@@ -211,6 +211,7 @@ class CheckoutView(View):
                     customer_name,
                     table_number,
                     idempotency_key=idempotency_key,
+                    staff_user=request.user if request.user.is_authenticated else None,
                 )
                 return JsonResponse({
                     'status': 'ok',
@@ -329,6 +330,7 @@ class CheckoutView(View):
             }, status=500)
 
 
+@method_decorator(rate_limit('receipt', limit=30, window=60), name='dispatch')
 class ReceiptView(View):
     """
     GET /r/{slug}/receipt/{order_id}/

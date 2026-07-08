@@ -18,6 +18,8 @@ to be easiest to write. Pick your folder and ignore the rest.
 If a word trips you up anywhere, check the [Glossary](./00-glossary.md) —
 it's shared across all three sections.
 
+For a summary of recent feature additions, operational improvements, and UI changes, please see the [Changelog](./CHANGELOG.md).
+
 ## Reading order by audience
 
 **Founder, support staff, or anyone non-technical** — read in this order:

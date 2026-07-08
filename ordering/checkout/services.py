@@ -218,7 +218,7 @@ def _create_order_rows(restaurant, priced_lines, total, customer_name, table_num
             OrderItemAddOn.objects.bulk_create(addon_rows)
     return order
 
-def place_cash_order(restaurant, cart_lines, customer_name, table_number, idempotency_key=None):
+def place_cash_order(restaurant, cart_lines, customer_name, table_number, idempotency_key=None, staff_user=None):
     """
     Full cash checkout in one atomic transaction:
       validate → lock stock → create order (UNPAID) → PaymentEvent(INITIATED)
@@ -237,6 +237,12 @@ def place_cash_order(restaurant, cart_lines, customer_name, table_number, idempo
             _lock_and_decrement_stock(priced_lines)
             order = _create_order_rows(restaurant, priced_lines, total, customer_name, table_number, payment_method=Order.PaymentMethod.CASH, status=Order.Status.UNPAID, idempotency_key=idempotency_key)
             PaymentEvent.objects.create(order=order, order_ref=order.order_ref_snapshot, restaurant=restaurant, event_type=PaymentEvent.EventType.INITIATED, amount=total)
+            
+            if staff_user and staff_user.is_authenticated and staff_user.restaurant_id == restaurant.id:
+                if getattr(staff_user, 'allow_cash_collection', False) or getattr(staff_user, 'is_owner', False):
+                    from ordering.orders.services import confirm_cash_payment
+                    confirm_cash_payment(order, staff_user)
+                    order.refresh_from_db()
     except IntegrityError:
         if idempotency_key:
             existing = Order.objects.filter(idempotency_key=idempotency_key, restaurant=restaurant).first()
