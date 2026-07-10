@@ -30,7 +30,15 @@
   </style>
 </head>
 
-<body class="bg-slate-100 text-slate-900 font-sans min-h-screen p-4 md:p-8 flex items-center justify-center">
+<body class="bg-slate-100 text-slate-900 font-sans min-h-screen p-4 md:p-8 flex items-center justify-center relative">
+
+  {% if request.user.is_authenticated and request.user.restaurant == restaurant %}
+    {% if request.user.is_owner or request.user.allow_cash_collection %}
+    <div class="absolute top-4 right-4 z-[100]">
+      <a href="{% url 'kitchen:kds' %}" class="inline-flex items-center rounded-2xl bg-brand-800 px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white transition hover:bg-brand-900 shadow-md">KDS</a>
+    </div>
+    {% endif %}
+  {% endif %}
 
   <div class="w-full max-w-md space-y-4">
     

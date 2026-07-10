@@ -92,11 +92,10 @@ before the web service boots, so schema changes deploy automatically.
 
 1. **Create a superuser** (via the Railway CLI or dashboard command
    palette): `python manage.py createsuperuser`, then log into
-   `https://yourdomain.com/admin/`.
+   `https://yourdomain.com/platform-admin/`.
 2. **Create your first restaurant** in Django Admin. The `slug` you
    choose becomes the menu URL (`slug='pizza-hut'` → `/r/pizza-hut/`).
-   A `RestaurantConfig` and `RestaurantPaymentConfig` are created for it
-   automatically.
+   A `RestaurantConfig` is created for it automatically.
 3. **Connect Razorpay webhooks.** In the Razorpay Dashboard (Live mode):
    **Settings → Webhooks → Add New Webhook**, pointing at:
 

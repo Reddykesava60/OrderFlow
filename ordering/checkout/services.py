@@ -17,7 +17,7 @@ from django.conf import settings
 from django.utils import timezone
 import bleach
 
-from core.models import MenuItem, AddOn, MenuItemAddOn, PlatformFeeRecord, PlatformSettings, RestaurantPaymentConfig
+from core.models import MenuItem, AddOn, MenuItemAddOn, PlatformFeeRecord, PlatformSettings
 from ordering.models import Order, OrderItem, OrderItemAddOn, RestaurantOrderCounter, StockReservation, WorkStatus
 from ordering.exceptions import CartError, PaymentConfigurationError
 from ordering.inventory.services import _lock_and_decrement_stock, _create_stock_reservations
@@ -37,36 +37,11 @@ def _payment_config_field(config, field):
     return getattr(config, field)
 
 def get_restaurant_payment_config(restaurant, require_usable=True, required_fields=None, require_active=True, *, allow_test_keys=False):
-    try:
-        config = restaurant.payment_config
-    except RestaurantPaymentConfig.DoesNotExist:
-        config = None
-    if config is None:
-        config = RestaurantPaymentConfig.objects.filter(restaurant=restaurant).first()
-    use_platform = False
-    if not config:
-        use_platform = True
-    elif hasattr(config, 'config_status') and config.config_status == RestaurantPaymentConfig.ConfigStatus.MIGRATED_TO_PLATFORM:
-        use_platform = True
-    elif require_active and (not config.is_active):
-        use_platform = True
-    if use_platform:
-        return _get_platform_payment_config(allow_test_keys=allow_test_keys)
-    if require_usable and required_fields is None:
-        required_fields = ('razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret')
-    if require_active and (not config.is_active):
-        raise PaymentConfigurationError('Razorpay is not active for this restaurant.')
-    if not allow_test_keys and (not settings.DEBUG) and (config.razorpay_key_id or '').startswith('rzp_test_'):
-        raise PaymentConfigurationError('Test Razorpay credentials are not allowed in production.')
-    if required_fields:
-        missing = [field for field in required_fields if not _payment_config_field(config, field)]
-        if missing:
-            return _get_platform_payment_config(allow_test_keys=allow_test_keys)
-    return config
+    return _get_platform_payment_config(allow_test_keys=allow_test_keys)
 
 class _PlatformPaymentConfigProxy:
     """
-    In-memory proxy that mimics RestaurantPaymentConfig using platform env vars.
+    In-memory proxy that mimics a payment configuration using platform env vars.
     Allows legacy code paths (CheckoutView, RazorpayVerifyView) to work unchanged.
     """
 

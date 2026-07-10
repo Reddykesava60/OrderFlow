@@ -14,7 +14,7 @@ paper than it is in practice.
   restaurants can each have a `manager` account without collision.
 - **Owners, Staff, and Admins can enable TOTP-based MFA** (`django-otp` +
   `otp_totp.TOTPDevice`) — a standard authenticator-app second factor.
-  It is set up via `/owner/mfa/setup/` (or `/admin/mfa/setup/` for platform admins) 
+  It is set up via `/owner/mfa/setup/` (or `/platform-admin/mfa/setup/` for platform admins) 
   and required on subsequent logins once confirmed. The authentication 
   happens in a dedicated 2-step verification flow after standard username/password login.
   Both `ActiveStaffMixin` (which covers both owners and staff) and `AdminMfaMiddleware` gate on
@@ -54,6 +54,7 @@ paper than it is in practice.
   account) to set a new password before reaching any other authenticated
   page — closing the common "shared default password never gets changed"
   gap.
+- **Platform Admin overrides**: Platform administrators have exclusive control over `kds_prep_enabled` and master payment switches (`admin_cash_enabled`, `admin_upi_enabled`, `admin_post_payment_enabled`) via the Django admin. A restaurant owner can only toggle payment methods in their dashboard if the platform admin has explicitly allowed them.
 
 ## Tenant isolation — and an honest caveat about Row-Level Security
 
@@ -75,8 +76,7 @@ service layer.
 
 ## Encryption of stored secrets
 
-Gateway credentials (`RestaurantPaymentConfig.razorpay_key_secret`,
-`razorpay_webhook_secret`, and `TenantPaymentConfig.encrypted_credentials`)
+Gateway credentials (`TenantPaymentConfig.encrypted_credentials`)
 are encrypted at rest using Fernet symmetric encryption
 (`ordering/payments/crypto.py`), keyed off `PAYMENT_ENCRYPTION_KEY` — a
 setting that's deliberately required to be **distinct from `SECRET_KEY`**

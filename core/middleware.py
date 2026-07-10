@@ -46,7 +46,7 @@ class MustChangePasswordMiddleware:
             if not (
                 request.path in allowed_paths
                 or request.path.startswith(settings.STATIC_URL)
-                or request.path.startswith("/admin/")
+                or request.path.startswith("/platform-admin/")
             ):
                 return redirect("owner:change_password")
 
@@ -63,7 +63,7 @@ class AdminMfaMiddleware:
 
     def __call__(self, request):
         path = request.path
-        if path.startswith('/admin/') and request.user.is_authenticated and request.user.is_staff:
+        if path.startswith('/platform-admin/') and request.user.is_authenticated and request.user.is_staff:
             exempt_paths = [
                 reverse('admin_mfa_setup'),
                 reverse('admin_mfa_verify'),

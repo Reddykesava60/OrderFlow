@@ -51,11 +51,6 @@ class OwnerAuditLogTests(TestCase):
 				'reopen_message': 'Back in 10',
 				'cash_enabled': 'on',
 				'upi_enabled': 'on',
-				'account_name': 'DineFlow Live',
-				'razorpay_key_id': 'rzp_live_1234567890',
-				'razorpay_key_secret': 'secret-value',
-				'razorpay_webhook_secret': 'webhook-secret',
-				'razorpay_is_active': 'on',
 				'slug': 'audit-test',
 			},
 		)
@@ -64,9 +59,6 @@ class OwnerAuditLogTests(TestCase):
 		log = OwnerAuditLog.objects.get(restaurant=self.restaurant)
 		self.assertEqual(log.action, OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG)
 		self.assertEqual(log.details['restaurant_config_after']['reopen_message'], 'Back in 10')
-		self.assertEqual(log.details['payment_config_after']['account_name'], 'DineFlow Live')
-		self.assertTrue(log.details['payment_config_after']['razorpay_key_secret_present'])
-		self.assertTrue(log.details['payment_config_after']['razorpay_webhook_secret_present'])
 
 
 class OwnerMfaTests(TestCase):
@@ -127,6 +119,7 @@ class KdsPrepEnabledTests(TestCase):
 		"""POST to config with minimum valid data (cash_enabled on)."""
 		data = {
 			'cash_enabled': 'on',
+			'post_payment_enabled': 'on',
 			'slug': self.restaurant.slug,
 		}
 		if extra:
@@ -141,7 +134,7 @@ class KdsPrepEnabledTests(TestCase):
 		self.client.force_login(self.staff)
 		response = self.client.post(
 			reverse('owner:config'),
-			data={'cash_enabled': 'on', 'slug': self.restaurant.slug},
+			data={'cash_enabled': 'on', 'post_payment_enabled': 'on', 'slug': self.restaurant.slug},
 		)
 
 		self.assertEqual(response.status_code, 403)

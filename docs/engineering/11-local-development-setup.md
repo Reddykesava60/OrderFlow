@@ -105,10 +105,10 @@ surface.
 
 ## First thing to set up after migrating
 
-A fresh database has no restaurant in it. Through `/admin/`, create a
+A fresh database has no restaurant in it. Through `/platform-admin/`, create a
 `Restaurant` (the `slug` you choose becomes the menu URL,
-`/r/<slug>/`) — a `RestaurantConfig` and `RestaurantPaymentConfig` are
-auto-created for it via a signal. Without at least one restaurant, there's
+`/r/<slug>/`) — a `RestaurantConfig` is
+created automatically via a post-save signal. Without at least one restaurant, there's
 nothing to view at `/r/...` and nothing for a staff account to log into.
 
 ## Running tests

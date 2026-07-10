@@ -172,9 +172,84 @@
     @media (max-width: 560px) {
       .meta-grid { grid-template-columns: 1fr; }
     }
+    .kds-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--brand);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(26, 60, 94, 0.2);
+      z-index: 100;
+      transition: all 0.2s;
+    }
+    .kds-btn:hover { background: #10263b; }
+    #global-page-loader {
+      position: fixed;
+      inset: 0;
+      background: rgba(248, 250, 252, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    #global-page-loader.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .loader-card {
+      background: #fff;
+      padding: 24px;
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid #e0e7ff;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .loader-svg {
+      width: 32px;
+      height: 32px;
+      color: var(--brand);
+      animation: spin 1s linear infinite;
+    }
+    .loader-text {
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--brand);
+      letter-spacing: 0.025em;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <div id="global-page-loader" style="display: none;">
+    <div class="loader-card">
+      <svg class="loader-svg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle opacity="0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path opacity="0.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span class="loader-text">Loading...</span>
+    </div>
+  </div>
+  {% if request.user.is_authenticated and request.user.restaurant == restaurant %}
+    {% if request.user.is_owner or request.user.allow_cash_collection %}
+    <a href="{% url 'kitchen:kds' %}" class="kds-btn" onclick="this.innerHTML='Loading...'; this.style.opacity='0.6'; this.style.pointerEvents='none';">KDS</a>
+    {% endif %}
+  {% endif %}
+
   <div class="card">
     <div class="restaurant">{{ restaurant.name }}</div>
     <div class="order-num">#{{ order.order_number }}</div>
@@ -335,7 +410,7 @@
 
       <a class="btn" href="/r/{{ restaurant.slug }}/">Place another order</a>
     {% else %}
-      <a class="btn" href="{% url 'owner:dashboard' %}">Back to dashboard</a>
+      <a class="btn" href="{% url 'owner:dashboard' %}" onclick="let l=document.getElementById('global-page-loader'); l.style.display='flex'; requestAnimationFrame(()=>l.classList.add('show'));">Back to dashboard</a>
     {% endif %}
   </div>
 </body>

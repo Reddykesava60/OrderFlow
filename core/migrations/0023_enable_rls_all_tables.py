@@ -37,7 +37,7 @@ BEGIN
         IF tbl = 'django_migrations' THEN
             -- Ensure the connecting role can always read/write its own migration history
             EXECUTE 'DROP POLICY IF EXISTS django_migrations_access ON public.django_migrations';
-            EXECUTE format('CREATE POLICY django_migrations_access ON public.django_migrations FOR ALL TO %I USING (true) WITH CHECK (true)', current_user);
+            EXECUTE format('CREATE POLICY django_migrations_access ON public.django_migrations FOR ALL TO %%I USING (true) WITH CHECK (true)', current_user);
         END IF;
     END LOOP;
 END $$;

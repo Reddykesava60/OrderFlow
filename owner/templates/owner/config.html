@@ -31,26 +31,14 @@
       </div>
     </div>
 
-    <!-- Kitchen Workflow Card -->
-    <div class="bg-white p-6 rounded-3xl border border-slate-100 space-y-6">
-      <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Kitchen Workflow</h2>
 
-      <div class="grid grid-cols-1 gap-4">
-        <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
-          <input type="checkbox" name="kds_prep_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.kds_prep_enabled %}checked{% endif %}>
-          <div class="flex flex-col">
-            <span class="text-sm font-bold text-slate-800">Kitchen Prep Stage</span>
-            <span class="text-[10px] font-medium text-slate-400 uppercase">When off, orders are marked complete the moment staff tap Start — no separate being prepared step</span>
-          </div>
-        </label>
-      </div>
-    </div>
 
     <!-- Payment Configuration Card -->
     <div class="bg-white p-6 rounded-3xl border border-slate-100 space-y-6">
       <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Payment Gateways</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% if config.admin_cash_enabled %}
         <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
           <input type="checkbox" name="cash_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.cash_enabled %}checked{% endif %}>
           <div class="flex flex-col">
@@ -58,7 +46,9 @@
             <span class="text-[10px] font-medium text-slate-400 uppercase">Collect at counter</span>
           </div>
         </label>
+        {% endif %}
         
+        {% if config.admin_upi_enabled %}
         <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
           <input type="checkbox" name="upi_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.upi_enabled %}checked{% endif %}>
           <div class="flex flex-col">
@@ -66,65 +56,17 @@
             <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Via Razorpay</span>
           </div>
         </label>
-      </div>
+        {% endif %}
 
-      <!-- Razorpay Detailed Setup -->
-      <div class="mt-4 p-5 bg-slate-900 rounded-3xl space-y-5">
-        <div class="flex items-center justify-between">
-           <div class="flex items-center gap-2">
-              <span class="text-xs font-black text-white uppercase tracking-widest">Razorpay Setup</span>
-              <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase {% if payment_config.is_usable %}bg-emerald-500 text-white{% else %}bg-amber-500 text-white{% endif %}">
-                {% if payment_config.is_usable %}Connected{% else %}Incomplete{% endif %}
-              </span>
-           </div>
-           {% if payment_config.masked_key_id %}
-              <span class="text-[9px] font-bold text-slate-500" x-text="'ID: ' + '{{ payment_config.masked_key_id }}'"></span>
-           {% endif %}
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Account Label</label>
-            <input type="text" name="account_name" value="{{ payment_config.account_name }}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-medium text-white focus:border-brand-500 transition-all outline-none" placeholder="e.g. Primary Account">
+        {% if config.admin_post_payment_enabled %}
+        <label class="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all group">
+          <input type="checkbox" name="post_payment_enabled" class="w-5 h-5 rounded-lg border-slate-300 text-brand-600 focus:ring-brand-500" {% if config.post_payment_enabled %}checked{% endif %}>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold text-slate-800">Post Payment</span>
+            <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Pay later via Account</span>
           </div>
-          <div class="flex items-end pb-1">
-             <label class="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" name="razorpay_is_active" class="w-4 h-4 rounded border-white/20 bg-white/5 text-brand-500" {% if payment_config.is_active %}checked{% endif %}>
-                <span class="text-xs font-bold text-slate-300">Active for checkout</span>
-             </label>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Key ID</label>
-            <input type="text" name="razorpay_key_id" value="{{ payment_config.razorpay_key_id }}" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="rzp_live_...">
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-2">
-              <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                Key Secret
-                {% if payment_config.razorpay_key_secret %}
-                <span class="text-emerald-500 lowercase ml-1">(set)</span>
-                {% else %}
-                <span class="text-rose-500 lowercase ml-1">(not set)</span>
-                {% endif %}
-              </label>
-              <input type="password" name="razorpay_key_secret" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="••••••••••••••••">
-            </div>
-            <div class="space-y-2">
-              <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                Webhook Secret
-                {% if payment_config.razorpay_webhook_secret %}
-                <span class="text-emerald-500 lowercase ml-1">(set)</span>
-                {% else %}
-                <span class="text-rose-500 lowercase ml-1">(not set)</span>
-                {% endif %}
-              </label>
-              <input type="password" name="razorpay_webhook_secret" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/80 focus:border-brand-500 transition-all outline-none" placeholder="••••••••••••••••">
-            </div>
-          </div>
-        </div>
+        </label>
+        {% endif %}
       </div>
     </div>
 

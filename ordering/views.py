@@ -34,7 +34,7 @@ def _get_open_restaurant(slug):
     try:
         restaurant = (
             Restaurant.objects
-            .select_related('config', 'payment_config')
+            .select_related('config')
             .get(slug=slug, is_active=True)
         )
     except Restaurant.DoesNotExist:
@@ -83,7 +83,7 @@ class MenuView(View):
 
     def get(self, request, slug):
         restaurant, config, is_closed = _get_open_restaurant(slug)
-        upi_available = config.upi_enabled and restaurant.has_active_razorpay
+        upi_available = config.admin_upi_enabled and config.upi_enabled and restaurant.has_active_razorpay
 
         if is_closed:
             return render(request, 'ordering/closed.html', {
@@ -180,13 +180,16 @@ class CheckoutView(View):
 
         payment_method = data.get('payment_method', 'CASH').upper()
         if payment_method not in ('CASH', 'UPI', 'POST_PAYMENT'):
-            return JsonResponse({'error': 'INVALID_PAYMENT_METHOD'}, status=422)
+            return JsonResponse({'error': 'INVALID_PAYMENT_METHOD', 'message': 'Invalid payment method selected.'}, status=422)
 
-        if payment_method == 'CASH' and not config.cash_enabled:
-            return JsonResponse({'error': 'PAYMENT_METHOD_DISABLED'}, status=403)
+        if payment_method == 'CASH' and not (config.admin_cash_enabled and config.cash_enabled):
+            return JsonResponse({'error': 'PAYMENT_METHOD_DISABLED', 'message': 'Cash payment is currently disabled. Please choose another option.'}, status=403)
 
-        if payment_method == 'UPI' and (not config.upi_enabled or not restaurant.has_active_razorpay):
-            return JsonResponse({'error': 'PAYMENT_METHOD_DISABLED'}, status=403)
+        if payment_method == 'UPI' and (not (config.admin_upi_enabled and config.upi_enabled) or not restaurant.has_active_razorpay):
+            return JsonResponse({'error': 'PAYMENT_METHOD_DISABLED', 'message': 'UPI payment is currently unavailable. Please choose another option.'}, status=403)
+
+        if payment_method == 'POST_PAYMENT' and not (config.admin_post_payment_enabled and config.post_payment_enabled):
+            return JsonResponse({'error': 'PAYMENT_METHOD_DISABLED', 'message': 'Post Payment (Tab) is currently disabled. Please choose another option.'}, status=403)
 
         customer_name = (data.get('customer_name') or '').strip()
         if payment_method != 'POST_PAYMENT' and not customer_name:
@@ -416,7 +419,6 @@ class RazorpayVerifyView(View):
         try:
             order = (
                 Order.objects
-                .select_related('restaurant__payment_config')
                 .get(razorpay_order_id=rz_order_id)
             )
         except Order.DoesNotExist:

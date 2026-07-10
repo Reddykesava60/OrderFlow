@@ -142,7 +142,7 @@ route list is in
 
 ## Internal dashboards
 
-`/admin/` (Django Admin), `/admin/kds-metrics/`, and `/admin/ops/` are
+`/platform-admin/` (Django Admin), `/platform-admin/kds-metrics/`, and `/platform-admin/ops/` are
 platform-operator-only HTML dashboards, not part of the customer- or
 restaurant-facing API surface — see
 [Production Readiness Checklist](../operations/02-production-readiness-checklist.md)

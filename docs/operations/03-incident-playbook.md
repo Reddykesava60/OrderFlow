@@ -6,7 +6,7 @@ study. Each scenario tells you what you'll see, why it's happening, and
 exactly what to do (including "do nothing" when that's the correct
 answer).
 
-Start at `/admin/ops/` (superuser only) for a live snapshot: today's gross
+Start at `/platform-admin/ops/` (superuser only) for a live snapshot: today's gross
 order volume, today's accrued platform fees, the count of webhooks stuck
 retrying, the Dead Letter Queue size, and how many restaurants are
 currently active/online/offline. Most of the scenarios below are visible
@@ -61,7 +61,7 @@ python manage.py reconcile_payments --minutes 30 --limit 50
 
 ## The Dead Letter Queue has entries
 
-**Symptoms**: `/admin/ops/` shows a non-zero DLQ size, or you queried
+**Symptoms**: `/platform-admin/ops/` shows a non-zero DLQ size, or you queried
 `WebhookLog.objects.filter(status='DEAD_LETTERED')` directly.
 
 **What's happening**: A webhook's processing raised an exception three

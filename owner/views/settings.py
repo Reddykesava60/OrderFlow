@@ -23,7 +23,7 @@ from owner.views.staff import _write_owner_audit
 from core.mixins import OwnerRequiredMixin
 from core.models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
-    OwnerAuditLog, PlatformFeeRecord, Restaurant, RestaurantPaymentConfig, StaffFilter, User,
+    OwnerAuditLog, PlatformFeeRecord, Restaurant, StaffFilter, User,
 )
 from core.ratelimit import rate_limit
 from core.storage import get_supabase_storage_config, upload_bytes_public, upload_public_image
@@ -39,40 +39,26 @@ class ConfigView(OwnerRequiredMixin, View):
 
     def get(self, request):
         restaurant = self.get_restaurant()
-        payment_config, _ = RestaurantPaymentConfig.objects.get_or_create(restaurant=restaurant)
-        return render(request, 'owner/config.html', {'restaurant': restaurant, 'config': restaurant.config, 'payment_config': payment_config, 'menu_public_url': request.build_absolute_uri(reverse('ordering:menu', args=[restaurant.slug]))})
+        return render(request, 'owner/config.html', {'restaurant': restaurant, 'config': restaurant.config, 'menu_public_url': request.build_absolute_uri(reverse('ordering:menu', args=[restaurant.slug]))})
 
     def post(self, request):
         restaurant = self.get_restaurant()
         config = restaurant.config
-        payment_config, _ = RestaurantPaymentConfig.objects.get_or_create(restaurant=restaurant)
         data = request.POST
-        before_config = {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'kds_prep_enabled': config.kds_prep_enabled, 'slug': restaurant.slug}
-        before_payment = {'account_name': payment_config.account_name, 'razorpay_key_id_present': bool(payment_config.razorpay_key_id), 'razorpay_key_secret_present': bool(payment_config.get_razorpay_key_secret()), 'razorpay_webhook_secret_present': bool(payment_config.get_razorpay_webhook_secret()), 'is_active': payment_config.is_active}
+        before_config = {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug}
         config.is_open = 'is_open' in data
         config.reopen_message = data.get('reopen_message', '').strip()
-        cash = 'cash_enabled' in data
-        upi = 'upi_enabled' in data
-        if not cash and (not upi):
+        if config.admin_cash_enabled:
+            config.cash_enabled = 'cash_enabled' in data
+        if config.admin_upi_enabled:
+            config.upi_enabled = 'upi_enabled' in data
+        if config.admin_post_payment_enabled:
+            config.post_payment_enabled = 'post_payment_enabled' in data
+
+        if not config.cash_enabled and not config.upi_enabled and not config.post_payment_enabled:
             messages.error(request, 'At least one payment method must be enabled.')
             return redirect('owner:config')
-        payment_config.account_name = data.get('account_name', '').strip()
-        payment_config.razorpay_key_id = data.get('razorpay_key_id', '').strip()
-        key_secret = data.get('razorpay_key_secret', '').strip()
-        webhook_secret = data.get('razorpay_webhook_secret', '').strip()
-        if key_secret:
-            payment_config.set_razorpay_key_secret(key_secret)
-        if webhook_secret:
-            payment_config.set_razorpay_webhook_secret(webhook_secret)
-        payment_config.is_active = 'razorpay_is_active' in data
-        if upi and (not payment_config.is_usable):
-            messages.error(request, "To enable UPI, complete and activate this restaurant's Razorpay settings first.")
-            return redirect('owner:config')
-        config.cash_enabled = cash
-        config.upi_enabled = upi
-        config.kds_prep_enabled = 'kds_prep_enabled' in data
         config.save()
-        payment_config.save()
         new_slug = data.get('slug', '').strip().lower()
         if new_slug and new_slug != restaurant.slug:
             from django.utils.text import slugify
@@ -88,7 +74,7 @@ class ConfigView(OwnerRequiredMixin, View):
             restaurant.save(update_fields=['slug', 'menu_qr_code_url'])
             messages.info(request, f"Slug changed to '{clean_slug}'. Update your QR code.")
         messages.success(request, 'Settings saved.')
-        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG, details={'restaurant_config_before': before_config, 'restaurant_config_after': {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'kds_prep_enabled': config.kds_prep_enabled, 'slug': restaurant.slug}, 'payment_config_before': before_payment, 'payment_config_after': {'account_name': payment_config.account_name, 'razorpay_key_id_present': bool(payment_config.razorpay_key_id), 'razorpay_key_secret_present': bool(payment_config.get_razorpay_key_secret()), 'razorpay_webhook_secret_present': bool(payment_config.get_razorpay_webhook_secret()), 'is_active': payment_config.is_active}})
+        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG, details={'restaurant_config_before': before_config, 'restaurant_config_after': {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug}})
         return redirect('owner:config')
 
 class MenuQrCodeDownloadView(OwnerRequiredMixin, View):

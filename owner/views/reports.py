@@ -22,7 +22,7 @@ from django.views import View
 from core.mixins import OwnerRequiredMixin
 from core.models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
-    OwnerAuditLog, PlatformFeeRecord, Restaurant, RestaurantPaymentConfig, StaffFilter, User,
+    OwnerAuditLog, PlatformFeeRecord, Restaurant, StaffFilter, User,
 )
 from core.ratelimit import rate_limit
 from core.storage import get_supabase_storage_config, upload_bytes_public, upload_public_image

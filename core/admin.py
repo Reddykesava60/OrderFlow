@@ -13,7 +13,7 @@ from .models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
     JournalEntry, JournalLine, MonthlyPlatformFeeStatement,
     PlatformFeeRecord, PlatformSettings, Restaurant,
-    MerchantLedgerBalance, RestaurantConfig, RestaurantPaymentConfig,
+    MerchantLedgerBalance, RestaurantConfig,
     SettlementBatch, SettlementRecord, StaffFilter, User,
 )
 from .timeutils import local_day_bounds
@@ -25,37 +25,8 @@ class RestaurantConfigInline(admin.StackedInline):
     model = RestaurantConfig
     can_delete = False
     verbose_name_plural = 'Restaurant config'
-    fields = ('is_open', 'reopen_message', 'cash_enabled', 'upi_enabled', 'kds_prep_enabled', 'cash_payment_timeout_minutes_override')
+    fields = ('is_open', 'reopen_message', 'admin_cash_enabled', 'cash_enabled', 'admin_upi_enabled', 'upi_enabled', 'kds_prep_enabled', 'admin_post_payment_enabled', 'post_payment_enabled', 'cash_payment_timeout_minutes_override')
 
-
-class RestaurantPaymentConfigInline(admin.StackedInline):
-    model = RestaurantPaymentConfig
-    can_delete = False
-    verbose_name_plural = 'Razorpay config'
-    fields = (
-        'account_name',
-        'razorpay_key_id',
-        'masked_secret_display',
-        'razorpay_key_secret',
-        'masked_webhook_display',
-        'razorpay_webhook_secret',
-        'is_active',
-    )
-    readonly_fields = ('masked_secret_display', 'masked_webhook_display')
-
-    @admin.display(description='Current key secret (masked)')
-    def masked_secret_display(self, obj):
-        val = obj.get_razorpay_key_secret()
-        if not val:
-            return format_html('<em>Not set</em>')
-        return format_html('<code>{}…{}</code>', val[:4], val[-4:])
-
-    @admin.display(description='Current webhook secret (masked)')
-    def masked_webhook_display(self, obj):
-        val = obj.get_razorpay_webhook_secret()
-        if not val:
-            return format_html('<em>Not set</em>')
-        return format_html('<code>{}…{}</code>', val[:4], val[-4:])
 
 
 # ── Restaurant Admin ──────────────────────────────────────────────────────────
@@ -79,7 +50,7 @@ class RestaurantAdmin(admin.ModelAdmin):
     search_fields  = ['name', 'slug']
     prepopulated_fields = {'slug': ('name',)}
     readonly_fields = ['created_at', 'id', 'menu_qr_code_url']
-    inlines        = [RestaurantConfigInline, RestaurantPaymentConfigInline]
+    inlines        = [RestaurantConfigInline]
     actions        = ['deactivate_restaurants', 'activate_restaurants']
 
     def get_queryset(self, request):

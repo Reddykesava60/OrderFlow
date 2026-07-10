@@ -31,12 +31,9 @@ class Restaurant(models.Model):
 
     @property
     def has_active_razorpay(self):
-        """True if this restaurant can accept Razorpay payments — via own config OR platform credentials."""
-        try:
-            config = self.payment_config
-        except RestaurantPaymentConfig.DoesNotExist:
-            config = None
-        if config and config.is_usable:
+        """True if this restaurant can accept Razorpay payments — via TenantPaymentConfig OR platform credentials."""
+        from ordering.models import TenantPaymentConfig
+        if TenantPaymentConfig.objects.filter(restaurant=self, is_active=True).exists():
             return True
         # Fallback: platform-level credentials
         from django.conf import settings as app_settings
@@ -51,11 +48,21 @@ class RestaurantConfig(models.Model):
     restaurant      = models.OneToOneField(Restaurant, on_delete=models.CASCADE, related_name='config')
     is_open         = models.BooleanField(default=True)
     reopen_message  = models.CharField(max_length=300, blank=True)
+    admin_cash_enabled = models.BooleanField(default=True, help_text='Platform toggle. If False, the owner cannot accept Cash.')
     cash_enabled    = models.BooleanField(default=True)
+    admin_upi_enabled  = models.BooleanField(default=True, help_text='Platform toggle. If False, the owner cannot accept UPI.')
     upi_enabled     = models.BooleanField(default=True)
     kds_prep_enabled = models.BooleanField(
         default=True,
         help_text='When off, tapping Start in the KDS marks items complete immediately — no separate preparing step.',
+    )
+    admin_post_payment_enabled = models.BooleanField(
+        default=True,
+        help_text='Platform toggle. If False, the owner cannot accept Post Payment.',
+    )
+    post_payment_enabled = models.BooleanField(
+        default=True,
+        help_text='When off, customers cannot choose "Post Payment (Account)" at checkout.',
     )
     cash_payment_timeout_minutes_override = models.PositiveIntegerField(
         null=True, blank=True,
@@ -70,86 +77,6 @@ class RestaurantConfig(models.Model):
     def __str__(self):
         return f"Config: {self.restaurant.name}"
 
-
-class RestaurantPaymentConfig(models.Model):
-    class ConfigStatus(models.TextChoices):
-        ACTIVE              = 'ACTIVE',              'Active'
-        DISABLED            = 'DISABLED',            'Disabled'
-        MIGRATED_TO_PLATFORM = 'MIGRATED_TO_PLATFORM', 'Migrated to Platform'
-
-    id                      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    restaurant              = models.OneToOneField(
-        Restaurant, on_delete=models.CASCADE, related_name='payment_config'
-    )
-    account_name            = models.CharField(max_length=120, blank=True)
-    razorpay_key_id         = models.CharField(max_length=100, blank=True)
-    razorpay_key_secret     = models.TextField(blank=True)
-    razorpay_webhook_secret = models.TextField(blank=True)
-    is_active               = models.BooleanField(default=False)
-    config_status           = models.CharField(
-        max_length=25, choices=ConfigStatus.choices, default=ConfigStatus.ACTIVE,
-        help_text='Operational status. MIGRATED_TO_PLATFORM means this config is superseded by platform credentials.',
-    )
-    created_at              = models.DateTimeField(auto_now_add=True)
-    updated_at              = models.DateTimeField(auto_now=True)
-
-    @staticmethod
-    def _plain_secret(value):
-        if not value:
-            return ''
-        from ordering.payments.crypto import decrypt_text
-        return decrypt_text(value) or value
-
-    @classmethod
-    def _stored_secret(cls, value):
-        value = value or ''
-        if not value:
-            return ''
-        from ordering.payments.crypto import decrypt_text, encrypt_text
-        return value if decrypt_text(value) else encrypt_text(value)
-
-    def get_razorpay_key_secret(self):
-        return self._plain_secret(self.razorpay_key_secret)
-
-    def set_razorpay_key_secret(self, secret):
-        self.razorpay_key_secret = secret or ''
-
-    def get_razorpay_webhook_secret(self):
-        return self._plain_secret(self.razorpay_webhook_secret)
-
-    def set_razorpay_webhook_secret(self, secret):
-        self.razorpay_webhook_secret = secret or ''
-
-    def save(self, *args, **kwargs):
-        raw_key_secret = self.razorpay_key_secret
-        raw_webhook_secret = self.razorpay_webhook_secret
-        self.razorpay_key_secret = self._stored_secret(raw_key_secret)
-        self.razorpay_webhook_secret = self._stored_secret(raw_webhook_secret)
-        try:
-            super().save(*args, **kwargs)
-        finally:
-            self.razorpay_key_secret = raw_key_secret
-            self.razorpay_webhook_secret = raw_webhook_secret
-
-    @property
-    def is_usable(self):
-        return bool(
-            self.is_active
-            and self.razorpay_key_id
-            and self.get_razorpay_key_secret()
-            and self.get_razorpay_webhook_secret()
-        )
-
-    @property
-    def masked_key_id(self):
-        if not self.razorpay_key_id:
-            return ''
-        return f"{self.razorpay_key_id[:8]}..."
-
-    def __str__(self):
-        label = self.account_name or self.restaurant.name
-        status = 'active' if self.is_usable else 'inactive'
-        return f"{label} Razorpay ({status})"
 
 
 class PlatformSettings(models.Model):
@@ -222,8 +149,6 @@ def create_restaurant_config(sender, instance, created, **kwargs):
     if created:
         if not hasattr(instance, 'config'):
             RestaurantConfig.objects.get_or_create(restaurant=instance)
-        if not hasattr(instance, 'payment_config'):
-            RestaurantPaymentConfig.objects.get_or_create(restaurant=instance)
 
 
 # ── User ─────────────────────────────────────────────────────────────────────

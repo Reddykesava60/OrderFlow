@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
 
 from core.models import Customer
@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 class CustomerListView(OwnerRequiredMixin, View):
     def get(self, request):
+        if not request.user.restaurant.config.admin_post_payment_enabled:
+            from django.contrib import messages
+            messages.error(request, "Post payment is disabled for this restaurant.")
+            return redirect('owner:dashboard')
+            
         return render(request, 'owner/customers.html', {
             'restaurant': request.user.restaurant
         })

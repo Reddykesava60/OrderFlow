@@ -14,13 +14,7 @@ The resolution order:
 
 1. **`TenantPaymentConfig`** — the current, multi-provider model. If the
    restaurant has an active config here, it wins.
-2. **`RestaurantPaymentConfig`** — the legacy, Razorpay-only model. Used if
-   step 1 found nothing, and only if it's fully configured (key ID, key
-   secret, and webhook secret all present) — a half-configured legacy
-   config is treated as absent rather than used in a broken state. In
-   production, a legacy config whose key starts with `rzp_test_` is also
-   skipped, so test credentials can never accidentally take live traffic.
-3. **Platform-level credentials** (`RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`
+2. **`Platform-level credentials`** (`RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`
    environment variables) — the fallback every restaurant uses by default.
 
 ## Creating a payment

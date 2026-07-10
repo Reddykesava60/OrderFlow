@@ -36,7 +36,7 @@ docs/               You are here
 
 | File | Purpose |
 |---|---|
-| `models.py` | `Restaurant`, `RestaurantConfig`, `RestaurantPaymentConfig`, `PlatformSettings`, `User`, `Customer`, `MenuItem`, `AddOn`, `MenuItemAddOn`, `PlatformFeeRecord`, `OwnerAuditLog`, `MonthlyPlatformFeeStatement`, and the ledger models (`MerchantLedgerBalance`, `JournalEntry`, `JournalLine`, `SettlementBatch`, `SettlementRecord`) |
+| `models.py` | `Restaurant`, `RestaurantConfig`, `PlatformSettings`, `User`, `Customer`, `MenuItem`, `AddOn`, `MenuItemAddOn`, `PlatformFeeRecord`, `OwnerAuditLog`, `MonthlyPlatformFeeStatement`, and the ledger models (`MerchantLedgerBalance`, `JournalEntry`, `JournalLine`, `SettlementBatch`, `SettlementRecord`) |
 | `ledger.py` | `LedgerService` — the double-entry bookkeeping engine. See [Financial Ledger](./05-financial-ledger.md) |
 | `mixins.py` | Reusable view mixins (e.g., permission checks for staff actions) |
 | `middleware.py` | Security headers, forced password-change redirect |
@@ -44,7 +44,7 @@ docs/               You are here
 | `ratelimit.py` | Rate-limiting decorator used on sensitive endpoints |
 | `storage.py` | Supabase Storage integration for images |
 | `services.py` | Small cross-cutting helpers that don't belong to a specific domain |
-| `views_admin.py`, `views_ops.py`, `views_admin_mfa.py` | The `/admin/kds-metrics/` and `/admin/ops/` internal dashboards, plus the Admin MFA setup/verify flow |
+| `views_admin.py`, `views_ops.py`, `views_admin_mfa.py` | The `/platform-admin/kds-metrics/` and `/platform-admin/ops/` internal dashboards, plus the Admin MFA setup/verify flow |
 | `management/commands/sync_monthly_statements.py` | CLI entry point for the same job Celery Beat runs hourly |
 
 ## `ordering/` — the busiest app, split into sub-packages
@@ -114,8 +114,8 @@ All routing fans out from `dineflow/urls.py`:
 | Prefix | App | Audience |
 |---|---|---|
 | `/` | `dineflow` | Public landing page, health checks |
-| `/admin/` | Django admin | Platform operators |
-| `/admin/kds-metrics/`, `/admin/ops/` | `core` | Internal dashboards |
+| `/platform-admin/` | Django admin | Platform operators |
+| `/platform-admin/kds-metrics/`, `/platform-admin/ops/` | `core` | Internal dashboards |
 | `/r/` | `ordering` | Public, no login — the customer-facing menu and checkout |
 | `/payments/` | `ordering` (payments sub-package) | Public — Razorpay webhook + payment status polling |
 | `/api/` | `kitchen` | Session-authenticated kitchen staff |
