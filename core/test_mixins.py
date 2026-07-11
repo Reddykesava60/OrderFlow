@@ -128,6 +128,7 @@ class MixinSecurityTests(TestCase):
     def test_owner_required_mixin_blocks_unverified_mfa(self):
         request = self.factory.post('/dummy')
         request.user = self.owner_user
+        request.user.mfa_enabled = True
         request.user.is_verified = lambda: False  # MFA not verified
         response = DummyOwnerView.as_view()(request)
         

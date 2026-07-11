@@ -69,6 +69,7 @@ class OwnerMfaTests(TestCase):
 			password='pass1234',
 			role='OWNER',
 			restaurant=self.restaurant,
+			mfa_enabled=True,
 		)
 
 	def test_owner_views_require_mfa_verification(self):

@@ -37,7 +37,21 @@ def _payment_config_field(config, field):
     return getattr(config, field)
 
 def get_restaurant_payment_config(restaurant, require_usable=True, required_fields=None, require_active=True, *, allow_test_keys=False):
-    return _get_platform_payment_config(allow_test_keys=allow_test_keys)
+    from ordering.payments.resolver import resolve_payment_config
+    try:
+        resolved = resolve_payment_config(restaurant)
+        class _LegacyResolvedProxy:
+            def __init__(self, res):
+                self.razorpay_key_id = res.credentials.get('key_id', '')
+                self._key_secret = res.credentials.get('key_secret', '')
+                self._webhook_secret = res.webhook_secret
+            def get_razorpay_key_secret(self): return self._key_secret
+            def get_razorpay_webhook_secret(self): return self._webhook_secret
+        return _LegacyResolvedProxy(resolved)
+    except Exception as e:
+        if type(e).__name__ == 'PaymentConfigurationError':
+            raise PaymentConfigurationError(str(e))
+        raise
 
 class _PlatformPaymentConfigProxy:
     """

@@ -178,11 +178,17 @@ class TestUpiWebhook(TestCase):
             base_price=Decimal('90.00'),
             stock=10,
         )
-        payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'test_key_example123456'
-        payment_config.razorpay_key_secret = 'test_secret_123'
-        payment_config.razorpay_webhook_secret = 'whsec_test_123'
-        payment_config.is_active = True
+        from ordering.models import TenantPaymentConfig, PaymentProvider
+        payment_config = TenantPaymentConfig.objects.create(
+            restaurant=self.restaurant,
+            provider=PaymentProvider.RAZORPAY,
+            is_active=True
+        )
+        payment_config.set_credentials({
+            'key_id': 'test_key_example123456',
+            'key_secret': 'test_secret_123'
+        })
+        payment_config.set_webhook_secret('whsec_test_123')
         payment_config.save()
 
     def _place_upi_order(self):
@@ -205,7 +211,7 @@ class TestUpiWebhook(TestCase):
 
     def _signature_header(self, body):
         signature = hmac.new(
-            self.restaurant.payment_config.razorpay_webhook_secret.encode('utf-8'),
+            b'whsec_test_123',
             body,
             hashlib.sha256,
         ).hexdigest()
@@ -298,7 +304,7 @@ class TestUpiWebhook(TestCase):
         }
         body = json.dumps(payload).encode('utf-8')
         signature = hmac.new(
-            self.restaurant.payment_config.razorpay_webhook_secret.encode('utf-8'),
+            b'whsec_test_123',
             body,
             hashlib.sha256,
         ).hexdigest()
@@ -381,14 +387,21 @@ class TestPaymentAccessToken(TestCase):
 class TestRazorpayCredentialMode(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name='Mode Test', slug='mode-test')
-        payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'rzp_test_example123456'
-        payment_config.razorpay_key_secret = 'test_secret_123'
-        payment_config.razorpay_webhook_secret = 'whsec_test_123'
-        payment_config.is_active = True
+        from ordering.models import TenantPaymentConfig, PaymentProvider
+        payment_config = TenantPaymentConfig.objects.create(
+            restaurant=self.restaurant,
+            provider=PaymentProvider.RAZORPAY,
+            mode='test',
+            is_active=True
+        )
+        payment_config.set_credentials({
+            'key_id': 'rzp_test_example123456',
+            'key_secret': 'test_secret_123'
+        })
+        payment_config.set_webhook_secret('whsec_test_123')
         payment_config.save()
 
-    @override_settings(DEBUG=False)
+    @override_settings(DEBUG=False, TESTING=False)
     def test_test_credentials_rejected_in_production_mode(self):
         with self.assertRaises(PaymentConfigurationError):
             get_restaurant_payment_config(self.restaurant)
@@ -403,11 +416,17 @@ class TestUpiPaymentRecovery(TestCase):
             base_price=Decimal('90.00'),
             stock=10,
         )
-        payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'test_key_example123456'
-        payment_config.razorpay_key_secret = 'test_secret_123'
-        payment_config.razorpay_webhook_secret = 'whsec_test_123'
-        payment_config.is_active = True
+        from ordering.models import TenantPaymentConfig, PaymentProvider
+        payment_config = TenantPaymentConfig.objects.create(
+            restaurant=self.restaurant,
+            provider=PaymentProvider.RAZORPAY,
+            is_active=True
+        )
+        payment_config.set_credentials({
+            'key_id': 'test_key_example123456',
+            'key_secret': 'test_secret_123'
+        })
+        payment_config.set_webhook_secret('whsec_test_123')
         payment_config.save()
 
     @patch('razorpay.Client')
@@ -556,11 +575,17 @@ class TestUpiPaymentStateIntegrity(TestCase):
             base_price=Decimal('90.00'),
             stock=10,
         )
-        payment_config = self.restaurant.payment_config
-        payment_config.razorpay_key_id = 'test_key_integrity123'
-        payment_config.razorpay_key_secret = 'test_secret_123'
-        payment_config.razorpay_webhook_secret = 'whsec_test_123'
-        payment_config.is_active = True
+        from ordering.models import TenantPaymentConfig, PaymentProvider
+        payment_config = TenantPaymentConfig.objects.create(
+            restaurant=self.restaurant,
+            provider=PaymentProvider.RAZORPAY,
+            is_active=True
+        )
+        payment_config.set_credentials({
+            'key_id': 'test_key_integrity123',
+            'key_secret': 'test_secret_123'
+        })
+        payment_config.set_webhook_secret('whsec_test_123')
         payment_config.save()
 
     def _place_reserved_upi_order(self, *, provider_order_id='order_integrity_123'):
@@ -601,7 +626,7 @@ class TestUpiPaymentStateIntegrity(TestCase):
 
     def _signed_headers(self, body, event_id=None):
         signature = hmac.new(
-            self.restaurant.payment_config.razorpay_webhook_secret.encode('utf-8'),
+            b'whsec_test_123',
             body,
             hashlib.sha256,
         ).hexdigest()

@@ -31,6 +31,10 @@ def _tenant_config(restaurant, provider=None, *, require_webhook=False):
     if require_webhook and not webhook_secret:
         return None
 
+    if not settings.DEBUG and not getattr(settings, "TESTING", False):
+        if config.mode == 'test':
+            raise PaymentConfigurationError("Test payment credentials are not allowed in production.")
+
     return ResolvedPaymentConfig(
         provider=config.provider,
         mode=config.mode,

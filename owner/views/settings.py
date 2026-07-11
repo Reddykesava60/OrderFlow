@@ -45,7 +45,7 @@ class ConfigView(OwnerRequiredMixin, View):
         restaurant = self.get_restaurant()
         config = restaurant.config
         data = request.POST
-        before_config = {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug}
+        before_config = {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug, 'kds_prep_enabled': config.kds_prep_enabled}
         config.is_open = 'is_open' in data
         config.reopen_message = data.get('reopen_message', '').strip()
         if config.admin_cash_enabled:
@@ -54,6 +54,7 @@ class ConfigView(OwnerRequiredMixin, View):
             config.upi_enabled = 'upi_enabled' in data
         if config.admin_post_payment_enabled:
             config.post_payment_enabled = 'post_payment_enabled' in data
+        config.kds_prep_enabled = 'kds_prep_enabled' in data
 
         if not config.cash_enabled and not config.upi_enabled and not config.post_payment_enabled:
             messages.error(request, 'At least one payment method must be enabled.')
@@ -74,7 +75,7 @@ class ConfigView(OwnerRequiredMixin, View):
             restaurant.save(update_fields=['slug', 'menu_qr_code_url'])
             messages.info(request, f"Slug changed to '{clean_slug}'. Update your QR code.")
         messages.success(request, 'Settings saved.')
-        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG, details={'restaurant_config_before': before_config, 'restaurant_config_after': {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug}})
+        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.UPDATE_RESTAURANT_CONFIG, details={'restaurant_config_before': before_config, 'restaurant_config_after': {'is_open': config.is_open, 'reopen_message': config.reopen_message, 'cash_enabled': config.cash_enabled, 'upi_enabled': config.upi_enabled, 'post_payment_enabled': config.post_payment_enabled, 'slug': restaurant.slug, 'kds_prep_enabled': config.kds_prep_enabled}})
         return redirect('owner:config')
 
 class MenuQrCodeDownloadView(OwnerRequiredMixin, View):

@@ -32,8 +32,8 @@ class Restaurant(models.Model):
     @property
     def has_active_razorpay(self):
         """True if this restaurant can accept Razorpay payments — via TenantPaymentConfig OR platform credentials."""
-        from ordering.models import TenantPaymentConfig
-        if TenantPaymentConfig.objects.filter(restaurant=self, is_active=True).exists():
+        from ordering.models import TenantPaymentConfig, PaymentProvider
+        if TenantPaymentConfig.objects.filter(restaurant=self, provider=PaymentProvider.RAZORPAY, is_active=True).exists():
             return True
         # Fallback: platform-level credentials
         from django.conf import settings as app_settings
