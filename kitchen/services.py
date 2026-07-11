@@ -20,7 +20,9 @@ def trigger_kds_refresh(restaurant_id, order_id=None, action="refresh"):
             cache.incr(version_key)
         except ValueError:
             # Key doesn't exist or has expired — initialize it
-            cache.set(version_key, 1, timeout=86400)
+            # We initialize to 2 because KDSPollView defaults to 1.
+            # Setting it to 1 would fail to invalidate the v1 cache payload.
+            cache.set(version_key, 2, timeout=86400)
     except Exception as e:
         logger.warning(
             "kds_cache_invalidation_failed restaurant_id=%s error=%s - "
