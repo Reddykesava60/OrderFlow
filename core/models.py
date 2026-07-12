@@ -367,6 +367,28 @@ class MenuItemAddOn(models.Model):
         return f"{self.menu_item.name} + {self.addon.name}"
 
 
+def _invalidate_menu_cache(restaurant_id):
+    """Clear the cached rendered menu page for a restaurant."""
+    from django.core.cache import cache
+    cache.delete(f"menu_html_{restaurant_id}")
+
+
+@receiver(post_save, sender=MenuItem)
+def invalidate_menu_on_item_save(sender, instance, **kwargs):
+    _invalidate_menu_cache(instance.restaurant_id)
+
+
+@receiver(post_save, sender=AddOn)
+def invalidate_menu_on_addon_save(sender, instance, **kwargs):
+    _invalidate_menu_cache(instance.restaurant_id)
+
+
+@receiver(post_save, sender=MenuItemAddOn)
+def invalidate_menu_on_link_save(sender, instance, **kwargs):
+    if instance.menu_item_id:
+        _invalidate_menu_cache(instance.menu_item.restaurant_id)
+
+
 class PlatformFeeRecord(models.Model):
     """
     Append-only. One record per confirmed payment.

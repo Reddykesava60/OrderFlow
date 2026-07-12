@@ -79,7 +79,13 @@ class MenuView(View):
     """
     GET /r/{slug}/
     Public. No authentication required.
+
+    The full rendered response is cached for 30 seconds per restaurant
+    to avoid repeated DB hits during ordering rush.
     """
+
+    # Cache timeout in seconds for the rendered menu page
+    MENU_CACHE_TIMEOUT = 30
 
     def get(self, request, slug):
         restaurant, config, is_closed = _get_open_restaurant(slug)
@@ -90,6 +96,12 @@ class MenuView(View):
                 'restaurant': restaurant,
                 'reopen_message': config.reopen_message,
             }, status=200)
+
+        # ── Check response cache ─────────────────────────────────────
+        menu_cache_key = f"menu_html_{restaurant.id}"
+        cached_response = cache.get(menu_cache_key)
+        if cached_response is not None:
+            return cached_response
 
         has_active_addon = Exists(
             MenuItemAddOn.objects.filter(
@@ -128,13 +140,17 @@ class MenuView(View):
             else:
                 ungrouped.append(item)
 
-        return render(request, 'ordering/menu.html', {
+        response = render(request, 'ordering/menu.html', {
             'restaurant': restaurant,
             'config': config,
             'upi_available': upi_available,
             'grouped': grouped,
             'ungrouped': ungrouped,
         })
+
+        # Cache the rendered response
+        cache.set(menu_cache_key, response, timeout=self.MENU_CACHE_TIMEOUT)
+        return response
 
 
 @method_decorator(rate_limit('menu', limit=60, window=60), name='dispatch')

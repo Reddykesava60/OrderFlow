@@ -194,19 +194,18 @@ def _start_item_group(item, user):
     if update_fields:
         item.save(update_fields=update_fields)
 
-    for addon in pending_addons:
-        addon.prep_status = WorkStatus.PREPARING
-        addon.prep_started_at = addon.prep_started_at or now
-        addon.prep_started_by = addon.prep_started_by or user
-        addon.completed_at = None
-        addon.completed_by = None
-        addon.save(update_fields=[
-            "prep_status",
-            "prep_started_at",
-            "prep_started_by",
-            "completed_at",
-            "completed_by",
-        ])
+    if pending_addons:
+        # Bulk update all pending addons in one query instead of N saves
+        pending_addon_ids = [a.id for a in pending_addons]
+        OrderItemAddOn.objects.filter(id__in=pending_addon_ids, prep_started_at__isnull=True).update(
+            prep_started_at=now,
+            prep_started_by=user,
+        )
+        OrderItemAddOn.objects.filter(id__in=pending_addon_ids).update(
+            prep_status=WorkStatus.PREPARING,
+            completed_at=None,
+            completed_by=None,
+        )
         changed = True
 
     return changed
@@ -237,23 +236,20 @@ def _complete_item_group(item, user):
         ])
         changed = True
 
-    for addon in addon_rows:
-        if addon.prep_status == WorkStatus.COMPLETED:
-            continue
-        if not addon.prep_started_at:
-            addon.prep_started_at = now
-        if not addon.prep_started_by:
-            addon.prep_started_by = user
-        addon.prep_status = WorkStatus.COMPLETED
-        addon.completed_at = now
-        addon.completed_by = user
-        addon.save(update_fields=[
-            "prep_started_at",
-            "prep_started_by",
-            "prep_status",
-            "completed_at",
-            "completed_by",
-        ])
+    # Bulk update all incomplete addons instead of N individual saves
+    incomplete_addon_ids = [a.id for a in addon_rows if a.prep_status != WorkStatus.COMPLETED]
+    if incomplete_addon_ids:
+        # Set prep_started fields only where not already set
+        OrderItemAddOn.objects.filter(id__in=incomplete_addon_ids, prep_started_at__isnull=True).update(
+            prep_started_at=now,
+            prep_started_by=user,
+        )
+        # Mark all as completed
+        OrderItemAddOn.objects.filter(id__in=incomplete_addon_ids).update(
+            prep_status=WorkStatus.COMPLETED,
+            completed_at=now,
+            completed_by=user,
+        )
         changed = True
 
     return changed
@@ -288,6 +284,10 @@ def _track_active_screen(restaurant_id, screen_session_key):
 
 @method_decorator(rate_limit('kds_poll', limit=600, window=60), name='dispatch')
 class KDSPollView(ActiveStaffMixin, View):
+    # Maximum number of orders to include in the "All Orders" tab payload.
+    # Caps serialization cost as order volume grows throughout the day.
+    ALL_ORDERS_PAYLOAD_LIMIT = 50
+
     def _build_restaurant_payload(self, restaurant, today_start, today_end):
         import time
         start_time = time.time()
@@ -306,73 +306,62 @@ class KDSPollView(ActiveStaffMixin, View):
             ),
         )
 
-        active_orders = (
+        # ── Single query: fetch ALL today's orders with full prefetch ────
+        # Previously this was 3 separate queries (active, payment, all).
+        # Partitioning in Python is far cheaper than 3 DB round-trips.
+        all_today = list(
             Order.objects
             .filter(
                 restaurant=restaurant,
                 created_at__gte=today_start,
                 created_at__lt=today_end,
-                status__in=[Order.Status.PENDING, Order.Status.PREP_STARTED],
             )
             .prefetch_related(item_prefetch)
             .order_by("created_at")
         )
 
+        # ── Partition into buckets in Python ─────────────────────────────
         kitchen_data = []
         preparing_data = []
-        for order in active_orders:
-            kitchen_payload = _serialize_order_for_status(order, WorkStatus.PENDING)
-            preparing_payload = _serialize_order_for_status(order, WorkStatus.PREPARING)
-            if kitchen_payload:
-                kitchen_data.append(kitchen_payload)
-            if preparing_payload:
-                preparing_data.append(preparing_payload)
+        payment_orders = []
 
-        payment_orders = [
-            {
-                "id": str(order.id),
-                "order_number": order.order_number,
-                "customer": _first_name(order.customer_name),
-                "table": order.table_number,
-                "status": order.status,
-                "total": str(order.total),
-                "created_at": order.created_at.isoformat(),
-                "items": [
-                    {
-                        "id": str(item.id),
-                        "name": item.menu_item_name,
-                        "qty": item.quantity,
-                        "is_parcel": item.dining_option == item.DiningOption.PARCEL,
-                    }
-                    for item in order.items.all()
-                ],
-            }
-            for order in (
-                Order.objects
-                .filter(
-                    restaurant=restaurant,
-                    created_at__gte=today_start,
-                    created_at__lt=today_end,
-                    status=Order.Status.UNPAID,
-                    payment_method=Order.PaymentMethod.CASH,
-                )
-                .prefetch_related(Prefetch("items", queryset=OrderItem.objects.all()))
-                .order_by("created_at")
-            )
-        ]
+        for order in all_today:
+            # Active orders: PENDING or PREP_STARTED
+            if order.status in (Order.Status.PENDING, Order.Status.PREP_STARTED):
+                kitchen_payload = _serialize_order_for_status(order, WorkStatus.PENDING)
+                preparing_payload = _serialize_order_for_status(order, WorkStatus.PREPARING)
+                if kitchen_payload:
+                    kitchen_data.append(kitchen_payload)
+                if preparing_payload:
+                    preparing_data.append(preparing_payload)
 
+            # Cash payment orders awaiting collection
+            if order.status == Order.Status.UNPAID and order.payment_method == Order.PaymentMethod.CASH:
+                payment_orders.append({
+                    "id": str(order.id),
+                    "order_number": order.order_number,
+                    "customer": _first_name(order.customer_name),
+                    "table": order.table_number,
+                    "status": order.status,
+                    "total": str(order.total),
+                    "created_at": order.created_at.isoformat(),
+                    "items": [
+                        {
+                            "id": str(item.id),
+                            "name": item.menu_item_name,
+                            "qty": item.quantity,
+                            "is_parcel": item.dining_option == item.DiningOption.PARCEL,
+                        }
+                        for item in order.items.all()
+                    ],
+                })
+
+        # ── All orders: most recent first, capped ────────────────────────
+        all_orders_reversed = list(reversed(all_today))
+        all_orders_total = len(all_orders_reversed)
         all_orders = [
             _serialize_all_order(order)
-            for order in (
-                Order.objects
-                .filter(
-                    restaurant=restaurant,
-                    created_at__gte=today_start,
-                    created_at__lt=today_end,
-                )
-                .prefetch_related(item_prefetch)
-                .order_by("-created_at")
-            )
+            for order in all_orders_reversed[:self.ALL_ORDERS_PAYLOAD_LIMIT]
         ]
 
         filter_queryset = (
@@ -406,7 +395,7 @@ class KDSPollView(ActiveStaffMixin, View):
                 "kitchen": len(kitchen_data),
                 "preparing": len(preparing_data),
                 "payments": len(payment_orders),
-                "all_orders": len(all_orders),
+                "all_orders": all_orders_total,
             },
         }
         
@@ -464,10 +453,20 @@ class KDSPollView(ActiveStaffMixin, View):
                 finally:
                     cache.delete(lock_key)
             else:
-                # Lock is held, we are in a thundering herd.
-                # Do NOT serve stale cache! It causes UI desync between KDS screens.
-                # Just rebuild the payload directly.
-                master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
+                # Lock is held by another request. Wait briefly for it to
+                # populate the cache instead of firing a duplicate rebuild.
+                import time as _time
+                _waited = False
+                for _ in range(20):  # 20 × 100ms = 2s max
+                    _time.sleep(0.1)
+                    cached = cache.get(cache_key)
+                    if cached:
+                        master_payload = cached
+                        _waited = True
+                        break
+                if not _waited:
+                    # Lock holder timed out — rebuild ourselves
+                    master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
 
         # Apply User Permissions Filter
         response_payload = master_payload.copy()

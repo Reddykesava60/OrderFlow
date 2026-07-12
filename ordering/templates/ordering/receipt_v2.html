@@ -33,6 +33,9 @@
       padding: 28px 22px 24px;
       box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
     }
+    .border-CASH { border: 3px solid #ef4444 !important; }
+    .border-UPI { border: 3px solid #3b82f6 !important; }
+    .border-POST_PAYMENT { border: 3px solid #10b981 !important; }
     .restaurant { font-size: 13px; color: var(--muted); }
     .order-num {
       font-size: 46px;
@@ -47,29 +50,20 @@
       text-align: center;
       margin-bottom: 18px;
     }
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .meta-card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 14px;
-      background: #fbfdff;
-    }
-    .meta-label {
-      font-size: 11px;
+    .meta-compact {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--border);
+      font-size: 13px;
       color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-bottom: 5px;
-      font-weight: 700;
     }
-    .meta-value {
-      font-size: 14px;
-      font-weight: 700;
+    .meta-compact-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .meta-compact-val {
+      font-weight: 600;
       color: var(--text);
     }
     .status-badge {
@@ -169,9 +163,7 @@
       font-size: 15px;
       font-weight: 800;
     }
-    @media (max-width: 560px) {
-      .meta-grid { grid-template-columns: 1fr; }
-    }
+
     .kds-btn {
       position: absolute;
       top: 16px;
@@ -250,29 +242,15 @@
     {% endif %}
   {% endif %}
 
-  <div class="card">
+  <div class="card border-{{ order.payment_method }}">
     <div class="restaurant">{{ restaurant.name }}</div>
     <div class="order-num">#{{ order.order_number }}</div>
     <div class="order-label">Your order number</div>
 
-    <span class="status-badge status-{{ order.status }}">{{ order.get_status_display }}</span>
-
-    <div class="meta-grid">
-      <div class="meta-card">
-        <div class="meta-label">Customer</div>
-        <div class="meta-value">{{ order.customer_name }}</div>
-      </div>
-      <div class="meta-card">
-        <div class="meta-label">Payment</div>
-        <div class="meta-value">{{ order.get_payment_method_display }}</div>
-      </div>
-      <div class="meta-card">
-        <div class="meta-label">Table</div>
-        <div class="meta-value">{{ order.table_number|default:"Walk-in" }}</div>
-      </div>
-      <div class="meta-card">
-        <div class="meta-label">Placed</div>
-        <div class="meta-value">{{ order.created_at|date:"d M, H:i" }}</div>
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span class="status-badge status-{{ order.status }}" style="margin-bottom:0;">{{ order.get_status_display }}</span>
+      <div style="margin-top: 10px; font-size: 14px; font-weight: 800; color: var(--text);">
+        Placed: <span style="color: var(--brand);">{{ order.created_at|date:"d M, H:i" }}</span>
       </div>
     </div>
 
@@ -304,17 +282,24 @@
     {% endfor %}
 
     <div class="summary">
-      <div class="summary-row">
-        <span>Status</span>
-        <span>{{ order.get_status_display }}</span>
-      </div>
-      <div class="summary-row">
-        <span>Payment method</span>
-        <span>{{ order.get_payment_method_display }}</span>
-      </div>
-      <div class="summary-row total">
+      <div class="summary-row total" style="font-size: 18px; padding-top: 8px;">
         <span>Total</span>
         <span>₹{{ order.total }}</span>
+      </div>
+    </div>
+
+    <div class="meta-compact">
+      <div class="meta-compact-row">
+        <span>Customer</span>
+        <span class="meta-compact-val">{{ order.customer_name }}</span>
+      </div>
+      <div class="meta-compact-row">
+        <span>Table</span>
+        <span class="meta-compact-val">{{ order.table_number|default:"Walk-in" }}</span>
+      </div>
+      <div class="meta-compact-row">
+        <span>Payment Method</span>
+        <span class="meta-compact-val">{{ order.get_payment_method_display }}</span>
       </div>
     </div>
 

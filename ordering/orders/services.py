@@ -112,13 +112,31 @@ def sync_order_status(order):
     """
     Recompute the order's summary status from item/add-on work states.
     The order must already be paid before this is called.
+
+    Uses 2 aggregate queries instead of 4 individual EXISTS calls.
     """
     if order.status in (Order.Status.UNPAID, Order.Status.CANCELLED):
         return order
     with transaction.atomic():
         order = Order.objects.select_for_update().get(pk=order.pk)
-        pending_exists = OrderItem.objects.filter(order=order, prep_status=WorkStatus.PENDING).exists() or OrderItemAddOn.objects.filter(order_item__order=order, prep_status=WorkStatus.PENDING).exists()
-        preparing_exists = OrderItem.objects.filter(order=order, prep_status=WorkStatus.PREPARING).exists() or OrderItemAddOn.objects.filter(order_item__order=order, prep_status=WorkStatus.PREPARING).exists()
+
+        # ── 2 queries instead of 4: fetch distinct statuses per table ──
+        item_statuses = set(
+            OrderItem.objects
+            .filter(order=order, prep_status__in=[WorkStatus.PENDING, WorkStatus.PREPARING])
+            .values_list('prep_status', flat=True)
+            .distinct()
+        )
+        addon_statuses = set(
+            OrderItemAddOn.objects
+            .filter(order_item__order=order, prep_status__in=[WorkStatus.PENDING, WorkStatus.PREPARING])
+            .values_list('prep_status', flat=True)
+            .distinct()
+        )
+        all_statuses = item_statuses | addon_statuses
+        pending_exists = WorkStatus.PENDING in all_statuses
+        preparing_exists = WorkStatus.PREPARING in all_statuses
+
         now = timezone.now()
         update_fields = []
         if not pending_exists and (not preparing_exists):

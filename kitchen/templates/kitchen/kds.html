@@ -477,6 +477,15 @@
           this.pollImpl(); // Initial load
           this.nowTickTimer = setInterval(() => { this.nowMs = Date.now(); }, 1000);
           this.connectWebSocket();
+
+          // Fallback poll every 15s when WebSocket is not connected.
+          // During normal operation the WS push keeps the KDS current;
+          // this prevents stale data if the WS disconnects silently.
+          this.fallbackTimer = setInterval(() => {
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+              this.pollImpl();
+            }
+          }, 15000);
           
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
