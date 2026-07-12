@@ -395,7 +395,7 @@
 
       <a class="btn" href="/r/{{ restaurant.slug }}/">Place another order</a>
     {% else %}
-      <a class="btn" href="{% url 'owner:dashboard' %}" onclick="let l=document.getElementById('global-page-loader'); l.style.display='flex'; requestAnimationFrame(()=>l.classList.add('show'));">Back to dashboard</a>
+      <a class="btn" href="{{ back_url }}" onclick="let l=document.getElementById('global-page-loader'); l.style.display='flex'; requestAnimationFrame(()=>l.classList.add('show'));">Back</a>
     {% endif %}
   </div>
 </body>

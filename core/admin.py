@@ -152,13 +152,12 @@ class UserAdmin(BaseUserAdmin):
         'username',
         'restaurant',
         'role',
-        'allow_view_all_orders',
         'is_active',
         'must_change_password',
         'mfa_enabled',
         'last_login',
     ]
-    list_filter    = ['role', 'restaurant', 'allow_view_all_orders', 'is_active', 'must_change_password', 'mfa_enabled']
+    list_filter    = ['role', 'restaurant', 'is_active', 'must_change_password', 'mfa_enabled']
     search_fields  = ['username', 'first_name', 'last_name']
     readonly_fields = ['last_login', 'date_joined', 'id']
     actions        = ['force_password_reset', 'deactivate_users', 'activate_users', 'enable_mfa_for_users', 'disable_mfa_for_users']
@@ -169,7 +168,6 @@ class UserAdmin(BaseUserAdmin):
                 'role',
                 'restaurant',
                 'allow_cash_collection',
-                'allow_view_all_orders',
                 'allow_order_completion',
                 'must_change_password',
                 'mfa_enabled',
@@ -183,7 +181,6 @@ class UserAdmin(BaseUserAdmin):
                 'role',
                 'restaurant',
                 'allow_cash_collection',
-                'allow_view_all_orders',
                 'allow_order_completion',
                 'must_change_password',
                 'mfa_enabled',

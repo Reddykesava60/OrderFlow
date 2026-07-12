@@ -34,7 +34,7 @@ def _safe_image_url(image_value):
 def _can_run_bulk_order_action(user):
     return bool(
         user.is_owner or (
-            user.allow_order_completion and user.allow_view_all_orders
+            user.allow_order_completion
         )
     )
 
@@ -315,6 +315,7 @@ class KDSPollView(ActiveStaffMixin, View):
                 restaurant=restaurant,
                 created_at__gte=today_start,
                 created_at__lt=today_end,
+                status__in=[Order.Status.PENDING, Order.Status.PREP_STARTED, Order.Status.UNPAID],
             )
             .prefetch_related(item_prefetch)
             .order_by("created_at")
@@ -356,13 +357,6 @@ class KDSPollView(ActiveStaffMixin, View):
                     ],
                 })
 
-        # ── All orders: most recent first, capped ────────────────────────
-        all_orders_reversed = list(reversed(all_today))
-        all_orders_total = len(all_orders_reversed)
-        all_orders = [
-            _serialize_all_order(order)
-            for order in all_orders_reversed[:self.ALL_ORDERS_PAYLOAD_LIMIT]
-        ]
 
         filter_queryset = (
             StaffFilter.objects
@@ -390,12 +384,10 @@ class KDSPollView(ActiveStaffMixin, View):
             "kitchen": kitchen_data,
             "preparing": preparing_data,
             "payments": payment_orders,
-            "all_orders": all_orders,
             "tab_counts": {
                 "kitchen": len(kitchen_data),
                 "preparing": len(preparing_data),
                 "payments": len(payment_orders),
-                "all_orders": all_orders_total,
             },
         }
         
@@ -476,14 +468,9 @@ class KDSPollView(ActiveStaffMixin, View):
             response_payload["payments"] = []
             response_payload["tab_counts"]["payments"] = 0
             
-        if not (user.allow_view_all_orders or user.is_owner):
-            response_payload["all_orders"] = []
-            response_payload["tab_counts"]["all_orders"] = 0
-
         response_payload["permissions"] = {
             "can_complete": user.allow_order_completion or user.is_owner,
             "can_collect": user.allow_cash_collection or user.is_owner,
-            "can_view_all": user.allow_view_all_orders or user.is_owner,
             "can_bulk_update": _can_run_bulk_order_action(user),
         }
 
@@ -493,7 +480,6 @@ class KDSPollView(ActiveStaffMixin, View):
                 "is_owner": user.is_owner,
                 "allow_cash_collection": user.allow_cash_collection,
                 "allow_order_completion": user.allow_order_completion,
-                "allow_view_all_orders": user.allow_view_all_orders,
             }
 
         response = JsonResponse(response_payload)

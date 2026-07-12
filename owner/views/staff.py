@@ -115,8 +115,8 @@ class StaffCreateView(OwnerRequiredMixin, View):
             return redirect('owner:staff')
         temp_password = data.get('password', '').strip() or _gen_temp_password()
         with transaction.atomic():
-            user = User.objects.create_user(username=username, password=temp_password, restaurant=restaurant, role=User.Role.STAFF, allow_cash_collection='allow_cash_collection' in data, allow_view_all_orders='allow_view_all_orders' in data, allow_order_completion='allow_order_completion' in data, must_change_password=True, is_active=True)
-            _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.CREATE_STAFF, details={'username': username, 'permissions': {'allow_cash_collection': user.allow_cash_collection, 'allow_view_all_orders': user.allow_view_all_orders, 'allow_order_completion': user.allow_order_completion}})
+            user = User.objects.create_user(username=username, password=temp_password, restaurant=restaurant, role=User.Role.STAFF, allow_cash_collection='allow_cash_collection' in data, allow_order_completion='allow_order_completion' in data, must_change_password=True, is_active=True)
+            _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.CREATE_STAFF, details={'username': username, 'permissions': {'allow_cash_collection': user.allow_cash_collection, 'allow_order_completion': user.allow_order_completion}})
         request.session[f'temp_pw_{user.id}'] = temp_password
         messages.success(request, f"Staff account '{username}' created.")
         return redirect('owner:staff_created', user_id=user.id)
@@ -127,7 +127,7 @@ class StaffDeleteView(OwnerRequiredMixin, View):
         restaurant = self.get_restaurant()
         user = get_object_or_404(User, id=user_id, restaurant=restaurant, role=User.Role.STAFF)
         username = user.username
-        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.DELETE_STAFF, details={'username': username, 'permissions': {'allow_cash_collection': user.allow_cash_collection, 'allow_view_all_orders': user.allow_view_all_orders, 'allow_order_completion': user.allow_order_completion}})
+        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.DELETE_STAFF, details={'username': username, 'permissions': {'allow_cash_collection': user.allow_cash_collection, 'allow_order_completion': user.allow_order_completion}})
         user.delete()
         from kitchen.services import broadcast_user_disconnect
         broadcast_user_disconnect(user_id)
@@ -156,13 +156,12 @@ class StaffEditView(OwnerRequiredMixin, View):
         restaurant = self.get_restaurant()
         user = get_object_or_404(User, id=user_id, restaurant=restaurant, role=User.Role.STAFF)
         data = request.POST
-        before = {'allow_cash_collection': user.allow_cash_collection, 'allow_view_all_orders': user.allow_view_all_orders, 'allow_order_completion': user.allow_order_completion, 'is_active': user.is_active}
+        before = {'allow_cash_collection': user.allow_cash_collection, 'allow_order_completion': user.allow_order_completion, 'is_active': user.is_active}
         user.allow_cash_collection = 'allow_cash_collection' in data
-        user.allow_view_all_orders = 'allow_view_all_orders' in data
         user.allow_order_completion = 'allow_order_completion' in data
         user.is_active = 'is_active' in data
-        user.save(update_fields=['allow_cash_collection', 'allow_view_all_orders', 'allow_order_completion', 'is_active'])
-        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.EDIT_STAFF, details={'username': user.username, 'before': before, 'after': {'allow_cash_collection': user.allow_cash_collection, 'allow_view_all_orders': user.allow_view_all_orders, 'allow_order_completion': user.allow_order_completion, 'is_active': user.is_active}})
+        user.save(update_fields=['allow_cash_collection', 'allow_order_completion', 'is_active'])
+        _write_owner_audit(restaurant=restaurant, user=request.user, action=OwnerAuditLog.ActionType.EDIT_STAFF, details={'username': user.username, 'before': before, 'after': {'allow_cash_collection': user.allow_cash_collection, 'allow_order_completion': user.allow_order_completion, 'is_active': user.is_active}})
         from kitchen.services import broadcast_user_disconnect
         broadcast_user_disconnect(user.id)
         messages.success(request, f"'{user.username}' updated.")
@@ -192,7 +191,7 @@ class StaffPermissionToggleView(OwnerRequiredMixin, View):
         restaurant = self.get_restaurant()
         user = get_object_or_404(User, id=user_id, restaurant=restaurant, role=User.Role.STAFF)
         permission = request.POST.get('permission')
-        valid_permissions = ['allow_cash_collection', 'allow_order_completion', 'allow_view_all_orders', 'is_active']
+        valid_permissions = ['allow_cash_collection', 'allow_order_completion', 'is_active']
         if permission not in valid_permissions:
             return JsonResponse({'error': 'Invalid permission'}, status=400)
         current_val = getattr(user, permission)

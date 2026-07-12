@@ -157,7 +157,7 @@
               <tbody class="divide-y divide-slate-50">
                  {% for ord in orders %}
                  {% with fr=fee_map|get_item:ord.id %}
-                 <tr class="hover:bg-slate-50/30 transition-all {% if ord.status == 'CANCELLED' %}bg-rose-50/20{% endif %}">
+                 <tr class="hover:bg-slate-50/30 transition-all cursor-pointer {% if ord.status == 'CANCELLED' %}bg-rose-50/20{% endif %}" onclick="window.location='{% url 'owner:order_receipt' ord.id %}?next={% url 'owner:reconcile' %}'">
                     <td class="px-6 py-4">
                        <span class="text-xs font-black text-slate-400 uppercase">{{ ord.created_at|time:"H:i" }}</span>
                     </td>

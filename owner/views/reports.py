@@ -49,11 +49,13 @@ class OwnerOrderReceiptView(OwnerRequiredMixin, View):
         order = get_object_or_404(Order.objects.select_related('restaurant').prefetch_related('items__addons'), id=order_id, restaurant=restaurant)
         
         fee_record = order.fee_records.first()
+        back_url = request.GET.get('next') or reverse('owner:dashboard')
         context = {
             'restaurant': restaurant,
             'order': order,
             'fee_record': fee_record,
             'is_owner': True,
+            'back_url': back_url,
         }
 
         if order.payment_method == Order.PaymentMethod.CASH and order.status == Order.Status.UNPAID:

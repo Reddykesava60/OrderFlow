@@ -103,7 +103,7 @@ class KDSPollMetaTests(TestCase):
             password='pass1234',
             role='STAFF',
             restaurant=self.restaurant,
-            allow_view_all_orders=True,
+
             allow_cash_collection=False,
         )
         place_cash_order(
@@ -176,7 +176,7 @@ class KDSPollMetaTests(TestCase):
             password='pass1234',
             role='STAFF',
             restaurant=self.restaurant,
-            allow_view_all_orders=True,
+
             allow_cash_collection=False,
         )
 
@@ -327,7 +327,7 @@ class KDSPrepToggleTests(TestCase):
             role='STAFF',
             restaurant=self.restaurant,
             allow_order_completion=True,
-            allow_view_all_orders=True,
+
         )
         self.client.force_login(self.user)
 

@@ -30,10 +30,7 @@
         <input type="checkbox" name="allow_cash_collection" {% if staff_user.allow_cash_collection %}checked{% endif %}>
         Collect Cash (Payments tab)
       </label>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
-        <input type="checkbox" name="allow_view_all_orders" {% if staff_user.allow_view_all_orders %}checked{% endif %}>
-        View All Today's Orders, including completed
-      </label>
+
       <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
         <input type="checkbox" name="allow_order_completion" {% if staff_user.allow_order_completion %}checked{% endif %}>
         Mark Orders Done (Kitchen/Preparing)

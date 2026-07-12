@@ -20,7 +20,7 @@ class OwnerAuditLogTests(TestCase):
 			role='STAFF',
 			restaurant=self.restaurant,
 			allow_cash_collection=False,
-			allow_view_all_orders=False,
+
 			allow_order_completion=False,
 		)
 		self.client.force_login(self.owner)

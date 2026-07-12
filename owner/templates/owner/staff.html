@@ -33,7 +33,7 @@
 
       <div>
         <label class="mb-3 block text-[11px] font-black uppercase tracking-widest text-slate-400">Permissions</label>
-        <div class="grid gap-3 md:grid-cols-3">
+        <div class="grid gap-3 md:grid-cols-2">
           <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
             <input type="checkbox" name="allow_cash_collection" class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600">
             <span>
@@ -48,15 +48,7 @@
               <span class="mt-1 block text-xs text-slate-400">Start prep and complete items in Kitchen and Preparing tabs.</span>
             </span>
           </label>
-          <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <input type="checkbox" name="allow_view_all_orders" class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600">
-            <span>
-              <span class="block text-sm font-bold text-slate-800">View all today's orders</span>
-              <span class="mt-1 block text-xs text-slate-400">Includes completed orders in the All Orders tab for verification.</span>
-            </span>
-          </label>
         </div>
-      </div>
 
       <button type="submit" class="w-full rounded-3xl bg-brand-800 px-6 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition active:scale-[0.98] sm:w-auto">
         Create staff account
@@ -123,17 +115,6 @@
                 </label>
               </form>
 
-              <!-- View All Orders Toggle -->
-              <form method="post" action="{% url 'owner:staff_toggle_permission' member.id %}" data-permission-toggle class="m-0">
-                {% csrf_token %}
-                <input type="hidden" name="permission" value="allow_view_all_orders">
-                <label class="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 cursor-pointer hover:border-emerald-200 hover:bg-emerald-50/30 transition-all group/toggle">
-                  <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover/toggle:text-emerald-700">View All Orders</span>
-                  <div class="relative inline-flex items-center">
-                    <input type="checkbox" {% if member.allow_view_all_orders %}checked{% endif %} class="sr-only peer">
-                    <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                  </div>
-                </label>
               </form>
             </div>
           </div>

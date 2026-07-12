@@ -205,7 +205,7 @@
     </div>
     <div class="space-y-3">
       {% for order in today_orders %}
-      <a href="{% url 'owner:order_receipt' order.id %}" class="flex items-center gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:bg-white hover:border-brand-200">
+      <a href="{% url 'owner:order_receipt' order.id %}?next={% url 'owner:dashboard' %}" class="flex items-center gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:bg-white hover:border-brand-200">
         <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-sm font-black text-brand-700">{{ order.order_number }}</div>
         <div class="min-w-0 flex-1">
           <div class="truncate text-base font-black text-slate-900">{{ order.customer_name }}</div>

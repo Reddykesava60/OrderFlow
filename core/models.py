@@ -164,7 +164,7 @@ class User(AbstractUser):
         null=True, blank=True, related_name='users'
     )
     allow_cash_collection  = models.BooleanField(default=False)
-    allow_view_all_orders  = models.BooleanField(default=False)
+
     allow_order_completion = models.BooleanField(default=False)
     must_change_password   = models.BooleanField(default=False)
     mfa_enabled            = models.BooleanField(default=False, help_text="Require Two-Factor Authentication for this user.")
