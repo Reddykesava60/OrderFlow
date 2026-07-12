@@ -464,22 +464,10 @@ class KDSPollView(ActiveStaffMixin, View):
                 finally:
                     cache.delete(lock_key)
             else:
-                # Lock is held, we are in a thundering herd. Fall back to stale cache!
-                stale_version = version - 1
-                stale_key = f"kds_payload_{restaurant.id}_v{stale_version}"
-                stale_payload = cache.get(stale_key)
-                
-                if stale_payload:
-                    logger.info("metric kds_stale_served 1 restaurant_id=%s", restaurant.id)
-                    _incr_metric("kds_metrics_stale_served")
-                    master_payload = stale_payload
-                else:
-                    # Rare: Stale cache is gone and lock is held by another
-                    # request.  Previous code used time.sleep() retries which
-                    # blocked the Daphne worker thread and could exhaust the
-                    # pool under load.  Just rebuild the payload directly.
-                    master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
-                    cache.set(cache_key, master_payload, timeout=300)
+                # Lock is held, we are in a thundering herd.
+                # Do NOT serve stale cache! It causes UI desync between KDS screens.
+                # Just rebuild the payload directly.
+                master_payload = self._build_restaurant_payload(restaurant, today_start, today_end)
 
         # Apply User Permissions Filter
         response_payload = master_payload.copy()

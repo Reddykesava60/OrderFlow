@@ -5,6 +5,19 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
+
+
+import threading
+
+def _fire_and_forget_group_send(group_name, payload):
+    def _send():
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(group_name, payload)
+        except Exception as e:
+            logger.warning("Websocket broadcast failed to %s: %s", group_name, e)
+    threading.Thread(target=_send, daemon=True).start()
+
 def trigger_kds_refresh(restaurant_id, order_id=None, action="refresh"):
     """
     Triggers a WebSocket message to all clients connected to the
@@ -30,23 +43,14 @@ def trigger_kds_refresh(restaurant_id, order_id=None, action="refresh"):
             restaurant_id, e
         )
 
-    try:
-        channel_layer = get_channel_layer()
-        group_name = f"kds_{restaurant_id}"
-        
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'kds.refresh',
-                'order_id': str(order_id) if order_id else None,
-                'action': action,
-            }
-        )
-    except Exception as e:
-        logger.warning(
-            "kds_websocket_broadcast_failed restaurant_id=%s action=%s error=%s",
-            restaurant_id, action, e
-        )
+    _fire_and_forget_group_send(
+        f"kds_{restaurant_id}",
+        {
+            'type': 'kds.refresh',
+            'order_id': str(order_id) if order_id else None,
+            'action': action,
+        }
+    )
 
 
 def broadcast_payment_update(restaurant_id, payment_id, state, order_id=None):
@@ -54,37 +58,22 @@ def broadcast_payment_update(restaurant_id, payment_id, state, order_id=None):
     Broadcasts a payment status change to the KDS group.
     Fails gracefully if the realtime infrastructure (Redis) is down.
     """
-    try:
-        channel_layer = get_channel_layer()
-        group_name = f"kds_{restaurant_id}"
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'payment.update',
-                'payment_id': str(payment_id),
-                'state': state,
-                'order_id': str(order_id) if order_id else None,
-            }
-        )
-    except Exception as e:
-        logger.warning(
-            "kds_payment_broadcast_failed restaurant_id=%s payment_id=%s error=%s",
-            restaurant_id, payment_id, e
-        )
+    _fire_and_forget_group_send(
+        f"kds_{restaurant_id}",
+        {
+            'type': 'payment.update',
+            'payment_id': str(payment_id),
+            'state': state,
+            'order_id': str(order_id) if order_id else None,
+        }
+    )
 
 def broadcast_user_disconnect(user_id):
     """
     Forces a WebSocket disconnect for all active sessions of a specific user.
     Called when a user's role is revoked, auth is invalidated, or account is disabled.
     """
-    try:
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{user_id}",
-            {'type': 'force.disconnect'}
-        )
-    except Exception as e:
-        logger.warning(
-            "broadcast_user_disconnect_failed user_id=%s error=%s",
-            user_id, e
-        )
+    _fire_and_forget_group_send(
+        f"user_{user_id}",
+        {'type': 'force.disconnect'}
+    )
