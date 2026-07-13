@@ -74,6 +74,32 @@ class OrderAdmin(admin.ModelAdmin):
         'created_at', 'paid_at', 'prep_started_at', 'completed_at',
     ]
     inlines = [OrderItemInline]
+    actions = ['export_orders_csv']
+
+    @admin.action(description='Export selected orders as CSV')
+    def export_orders_csv(self, request, queryset):
+        import csv
+        from django.http import HttpResponse
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="orders.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'Order Number', 'Restaurant', 'Customer Name', 'Table Number',
+            'Status', 'Payment Method', 'Total', 'Created At', 'Paid At'
+        ])
+        for order in queryset.select_related('restaurant').order_by('-created_at'):
+            writer.writerow([
+                order.order_number,
+                order.restaurant.name if order.restaurant else '—',
+                order.customer_name,
+                order.table_number,
+                order.get_status_display(),
+                order.get_payment_method_display(),
+                order.total,
+                order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '—',
+                order.paid_at.strftime('%Y-%m-%d %H:%M') if order.paid_at else '—',
+            ])
+        return response
 
     @admin.display(description='Status')
     def status_badge(self, obj):

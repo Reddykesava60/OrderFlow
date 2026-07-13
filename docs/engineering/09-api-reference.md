@@ -121,7 +121,7 @@ flag set on the `User`, all trigger a KDS broadcast on success:
 | `POST /api/addon/<addon_id>/start-prep/` | Marks a single `OrderItemAddOn` as `PREPARING` (or `COMPLETED` if `kds_prep_enabled` is false) |
 | `POST /api/item/<item_id>/complete/` | Marks a single `OrderItem` as `COMPLETED` |
 | `POST /api/addon/<addon_id>/complete/` | Marks a single `OrderItemAddOn` as `COMPLETED` |
-| `POST /api/order/<order_id>/complete-all/` | Marks every item/add-on on the order `COMPLETED` (requires `allow_order_completion` **and** `allow_view_all_orders`, or owner role) |
+| `POST /api/order/<order_id>/complete-all/` | Marks every item/add-on on the order `COMPLETED` (requires `allow_order_completion`, or owner role) |
 | `POST /api/cash/<order_id>/collect/` | Confirms a cash order's payment (requires `allow_cash_collection`) |
 
 ### `GET /ws/kds/`

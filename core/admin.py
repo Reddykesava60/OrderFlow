@@ -53,6 +53,16 @@ class RestaurantAdmin(admin.ModelAdmin):
     inlines        = [RestaurantConfigInline]
     actions        = ['deactivate_restaurants', 'activate_restaurants']
 
+    fieldsets = (
+        (None, {
+            'fields': ('id', 'name', 'slug', 'logo', 'menu_qr_code_url', 'is_active', 'created_at')
+        }),
+        ('Platform Fee Overrides', {
+            'fields': ('custom_fee_mode', 'custom_fee_percent', 'custom_fee_fixed_amount'),
+            'description': 'Leave mode blank to use the global Platform Settings default.',
+        }),
+    )
+
     def get_queryset(self, request):
         from ordering.models import RestaurantLedger
         qs = super().get_queryset(request)
@@ -113,14 +123,24 @@ class RestaurantAdmin(admin.ModelAdmin):
         total = statement.total_fee_amount if statement else Decimal('0.00')
         return f"₹{total:,.2f}"
 
-    @admin.display(description='Commission')
+    @admin.display(description='Platform Fee Setting')
     def commission_rate_display(self, obj):
-        if obj.commission_rate is not None:
-            return f"{obj.commission_rate}%"
+        if obj.custom_fee_mode:
+            if obj.custom_fee_mode == PlatformSettings.FeeMode.PERCENTAGE:
+                return f"{obj.custom_fee_percent}% (Custom)"
+            elif obj.custom_fee_mode == PlatformSettings.FeeMode.FIXED:
+                return f"₹{obj.custom_fee_fixed_amount} (Custom)"
+            elif obj.custom_fee_mode == PlatformSettings.FeeMode.HYBRID:
+                return f"{obj.custom_fee_percent}% + ₹{obj.custom_fee_fixed_amount} (Custom)"
+        
         settings = PlatformSettings.get_solo()
         if settings.platform_fee_mode == PlatformSettings.FeeMode.PERCENTAGE:
             return f"{settings.platform_fee_percent}% (Default)"
-        return f"₹{settings.platform_fee_fixed_amount} (Default)"
+        elif settings.platform_fee_mode == PlatformSettings.FeeMode.FIXED:
+            return f"₹{settings.platform_fee_fixed_amount} (Default)"
+        elif settings.platform_fee_mode == PlatformSettings.FeeMode.HYBRID:
+            return f"{settings.platform_fee_percent}% + ₹{settings.platform_fee_fixed_amount} (Default)"
+        return "Unknown"
 
     @admin.display(description='Cash Timeout')
     def cash_timeout_display(self, obj):
@@ -283,7 +303,7 @@ class MonthlyPlatformFeeStatementAdmin(admin.ModelAdmin):
     date_hierarchy = 'month_date'
     ordering = ['-month_date', 'restaurant']
     readonly_fields = ['created_at', 'updated_at']
-    actions = ['mark_as_paid', 'mark_as_unpaid']
+    actions = ['mark_as_paid', 'mark_as_unpaid', 'export_statement_csv']
 
     @admin.display(description='Month')
     def month_date_display(self, obj):
@@ -306,6 +326,27 @@ class MonthlyPlatformFeeStatementAdmin(admin.ModelAdmin):
     def mark_as_unpaid(self, request, queryset):
         updated = queryset.update(is_paid=False, paid_at=None)
         self.message_user(request, f"{updated} statement(s) marked as unpaid.")
+
+    @admin.action(description='Export monthly statements as CSV')
+    def export_statement_csv(self, request, queryset):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="monthly_fee_statements.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'Month', 'Restaurant', 'Total Orders',
+            'Total Revenue', 'Total Fee Owed', 'Paid Status', 'Paid Date'
+        ])
+        for stmt in queryset.select_related('restaurant').order_by('-month_date', 'restaurant__name'):
+            writer.writerow([
+                stmt.month_date.strftime('%B %Y'),
+                stmt.restaurant.name if stmt.restaurant else '—',
+                stmt.total_orders_count,
+                stmt.total_revenue,
+                stmt.total_fee_amount,
+                'Yes' if stmt.is_paid else 'No',
+                stmt.paid_at.strftime('%Y-%m-%d %H:%M') if stmt.paid_at else '—',
+            ])
+        return response
 
 
 # ── Menu admins (lightweight — owners manage menu, but useful for debugging) ──

@@ -9,11 +9,11 @@ unless noted otherwise.
 
 | Model | What it represents |
 |---|---|
-| `Restaurant` | The tenant boundary. Almost every other table links back to one. Has a `slug` (used in customer-facing URLs) and an optional per-restaurant `commission_rate` override. |
+| `Restaurant` | The tenant boundary. Almost every other table links back to one. Has a `slug` (used in customer-facing URLs) and optional per-restaurant fee overrides (`custom_fee_mode`, `custom_fee_percent`, `custom_fee_fixed_amount`). |
 | `RestaurantConfig` | Per-restaurant toggles: `is_open`, user-controlled payment toggles (`cash_enabled`, `upi_enabled`, `post_payment_enabled`), platform-controlled master switches (`admin_cash_enabled`, `admin_upi_enabled`, `admin_post_payment_enabled`), `kds_prep_enabled` (platform-controlled), and an optional per-restaurant `cash_payment_timeout_minutes_override`. |
 
 | `PlatformSettings` | A singleton row (`singleton_key=1`, enforced in `save()`) holding platform-wide defaults: cash payment timeout, and the default platform fee mode/rate. |
-| `User` | Custom user model (`AUTH_USER_MODEL = 'core.User'`). Has a `role` (`OWNER` or `STAFF`), a `restaurant` FK, and granular permission flags (`allow_cash_collection`, `allow_view_all_orders`, `allow_order_completion`). |
+| `User` | Custom user model (`AUTH_USER_MODEL = 'core.User'`). Has a `role` (`OWNER` or `STAFF`), a `restaurant` FK, and granular permission flags (`allow_cash_collection`, `allow_order_completion`). |
 | `Customer` | A restaurant's own customer record, used for the optional "pay later" / tab feature. Authenticated with a hashed PIN, not a password. |
 
 ## Catalog (`core`)

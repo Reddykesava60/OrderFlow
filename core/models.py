@@ -14,6 +14,73 @@ def _clean(value):
     return bleach.clean(value, tags=[], strip=True) if value else value
 
 
+# ── Platform Settings ────────────────────────────────────────────────────────
+
+class PlatformSettings(models.Model):
+    class FeeMode(models.TextChoices):
+        PERCENTAGE = 'PERCENTAGE', 'Percentage'
+        FIXED = 'FIXED', 'Fixed per order'
+        HYBRID = 'HYBRID', 'Hybrid (Percentage + Fixed)'
+
+    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    cash_payment_timeout_minutes = models.PositiveIntegerField(
+        default=10,
+        help_text='Minutes before an unpaid cash order expires automatically.',
+    )
+    platform_fee_mode = models.CharField(
+        max_length=20,
+        choices=FeeMode.choices,
+        default=FeeMode.PERCENTAGE,
+        help_text='Choose whether platform fee is calculated as a percentage or fixed amount per order.',
+    )
+    platform_fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('3.00'),
+        help_text='Used when fee mode is Percentage or Hybrid.',
+    )
+    platform_fee_fixed_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Used when fee mode is Fixed per order or Hybrid.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Platform settings'
+        verbose_name_plural = 'Platform settings'
+
+    def save(self, *args, **kwargs):
+        self.singleton_key = 1
+        if self.cash_payment_timeout_minutes < 1:
+            self.cash_payment_timeout_minutes = 1
+        if self.platform_fee_percent < 0:
+            self.platform_fee_percent = Decimal('0.00')
+        if self.platform_fee_fixed_amount < 0:
+            self.platform_fee_fixed_amount = Decimal('0.00')
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        settings_obj, _ = cls.objects.get_or_create(
+            singleton_key=1,
+            defaults={
+                'cash_payment_timeout_minutes': 10,
+                'platform_fee_mode': cls.FeeMode.PERCENTAGE,
+                'platform_fee_percent': Decimal('3.00'),
+                'platform_fee_fixed_amount': Decimal('0.00'),
+            },
+        )
+        return settings_obj
+
+    def __str__(self):
+        return (
+            f"Cash timeout: {self.cash_payment_timeout_minutes} min | "
+            f"Fee mode: {self.platform_fee_mode}"
+        )
+
+
 # ── Restaurant ───────────────────────────────────────────────────────────────
 
 class Restaurant(models.Model):
@@ -23,9 +90,19 @@ class Restaurant(models.Model):
     logo       = models.TextField(blank=True)  # Supabase Storage public URL
     menu_qr_code_url = models.TextField(blank=True)  # Supabase Storage public URL
     is_active  = models.BooleanField(default=True)
-    commission_rate = models.DecimalField(
+    custom_fee_mode = models.CharField(
+        max_length=20,
+        choices=PlatformSettings.FeeMode.choices,
+        null=True, blank=True,
+        help_text='Per-restaurant fee mode override. NULL = use PlatformSettings default.',
+    )
+    custom_fee_percent = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text='Per-restaurant commission override (%). NULL = use PlatformSettings default.',
+        help_text='Per-restaurant fee percent override. Used if mode is Percentage or Hybrid.',
+    )
+    custom_fee_fixed_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Per-restaurant fixed fee override. Used if mode is Fixed or Hybrid.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -79,68 +156,6 @@ class RestaurantConfig(models.Model):
 
 
 
-class PlatformSettings(models.Model):
-    class FeeMode(models.TextChoices):
-        PERCENTAGE = 'PERCENTAGE', 'Percentage'
-        FIXED = 'FIXED', 'Fixed per order'
-
-    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
-    cash_payment_timeout_minutes = models.PositiveIntegerField(
-        default=10,
-        help_text='Minutes before an unpaid cash order expires automatically.',
-    )
-    platform_fee_mode = models.CharField(
-        max_length=20,
-        choices=FeeMode.choices,
-        default=FeeMode.PERCENTAGE,
-        help_text='Choose whether platform fee is calculated as a percentage or fixed amount per order.',
-    )
-    platform_fee_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal('3.00'),
-        help_text='Used when fee mode is Percentage.',
-    )
-    platform_fee_fixed_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text='Used when fee mode is Fixed per order.',
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Platform settings'
-        verbose_name_plural = 'Platform settings'
-
-    def save(self, *args, **kwargs):
-        self.singleton_key = 1
-        if self.cash_payment_timeout_minutes < 1:
-            self.cash_payment_timeout_minutes = 1
-        if self.platform_fee_percent < 0:
-            self.platform_fee_percent = Decimal('0.00')
-        if self.platform_fee_fixed_amount < 0:
-            self.platform_fee_fixed_amount = Decimal('0.00')
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def get_solo(cls):
-        settings_obj, _ = cls.objects.get_or_create(
-            singleton_key=1,
-            defaults={
-                'cash_payment_timeout_minutes': 10,
-                'platform_fee_mode': cls.FeeMode.PERCENTAGE,
-                'platform_fee_percent': Decimal('3.00'),
-                'platform_fee_fixed_amount': Decimal('0.00'),
-            },
-        )
-        return settings_obj
-
-    def __str__(self):
-        return (
-            f"Cash timeout: {self.cash_payment_timeout_minutes} min | "
-            f"Fee mode: {self.platform_fee_mode}"
-        )
 
 
 @receiver(post_save, sender=Restaurant)

@@ -25,22 +25,40 @@ TWO_PLACES = Decimal('0.01')
 
 def _compute_platform_fee(order_total, restaurant=None):
     """
-    Compute platform fee according to platform settings policy.
+    Compute platform fee according to platform settings policy or restaurant overrides.
     Returns (fee_amount, fee_rate_snapshot).
     """
-    if restaurant and restaurant.commission_rate is not None:
-        fee_rate = Decimal(restaurant.commission_rate)
-        fee_amount = (order_total * fee_rate / Decimal('100')).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
-        return (fee_amount, fee_rate)
     settings_obj = PlatformSettings.get_solo()
-    if settings_obj.platform_fee_mode == PlatformSettings.FeeMode.FIXED:
-        fee_amount = Decimal(settings_obj.platform_fee_fixed_amount).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+    
+    if restaurant and restaurant.custom_fee_mode:
+        mode = restaurant.custom_fee_mode
+        percent = restaurant.custom_fee_percent if restaurant.custom_fee_percent is not None else settings_obj.platform_fee_percent
+        fixed = restaurant.custom_fee_fixed_amount if restaurant.custom_fee_fixed_amount is not None else settings_obj.platform_fee_fixed_amount
+    else:
+        mode = settings_obj.platform_fee_mode
+        percent = settings_obj.platform_fee_percent
+        fixed = settings_obj.platform_fee_fixed_amount
+
+    if mode == PlatformSettings.FeeMode.FIXED:
+        fee_amount = Decimal(fixed).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
         if order_total > Decimal('0.00'):
             fee_rate_snapshot = (fee_amount * Decimal('100') / order_total).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
         else:
             fee_rate_snapshot = Decimal('0.00')
         return (fee_amount, fee_rate_snapshot)
-    fee_rate = Decimal(settings_obj.platform_fee_percent)
+    
+    if mode == PlatformSettings.FeeMode.HYBRID:
+        fixed_part = Decimal(fixed)
+        percent_rate = Decimal(percent)
+        fee_amount = ((order_total * percent_rate / Decimal('100')) + fixed_part).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+        if order_total > Decimal('0.00'):
+            fee_rate_snapshot = (fee_amount * Decimal('100') / order_total).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+        else:
+            fee_rate_snapshot = Decimal('0.00')
+        return (fee_amount, fee_rate_snapshot)
+        
+    # PERCENTAGE mode (default)
+    fee_rate = Decimal(percent)
     fee_amount = (order_total * fee_rate / Decimal('100')).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
     return (fee_amount, fee_rate)
 

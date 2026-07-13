@@ -75,9 +75,7 @@ restaurant. Dineflow never touches raw card or bank details directly.
 the payment transaction itself (`pending`, `initiated`, `paid`, `failed`,
 etc.) as reported by the payment gateway.
 
-**Platform fee / commission** — The percentage (or flat amount) Dineflow
-keeps from each order as its own revenue, with the rest belonging to the
-restaurant.
+**Platform fee / commission** — The percentage, flat amount, or hybrid fee Dineflow takes from each order. Calculated when the order is *paid* (cash or UPI). Configurable globally or per-restaurant.
 
 **Race condition** — A bug that only happens when two things happen at
 nearly the same instant (e.g., two customers buying the last item in stock

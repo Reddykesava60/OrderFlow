@@ -78,7 +78,7 @@ On connect, it joins two Redis groups:
 
 ## What the REST poll endpoint actually returns
 
-`KDSPollView` queries the current active orders for the staff member's
+`KDSPollView` queries strictly for active orders (`UNPAID`, `PREP_STARTED`, `READY`) for the staff member's
 restaurant (optionally scoped further by a `StaffFilter`, if the staff
 account is restricted to a subset of menu items), with prep status
 computed per item/add-on. It is the single source of truth the tablet

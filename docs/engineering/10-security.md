@@ -32,12 +32,9 @@ paper than it is in practice.
 
 ## Authorization
 
-- `User.role` (`OWNER`/`STAFF`) plus three independent boolean flags
-  (`allow_cash_collection`, `allow_view_all_orders`,
-  `allow_order_completion`) give fine-grained control over what a staff
-  account can do on the KDS — a restaurant can, for example, give someone
-  cash-handling permission without giving them the ability to bulk-complete
-  other staff's tickets.
+- **Staff**: Granted per-feature access through two boolean flags on the `User` model
+  (`allow_cash_collection`, `allow_order_completion`). 
+  Can never modify restaurant configuration.
 - **Enforcement ordering**: `CashCollectionMixin`, `OrderCompletionMixin`,
   and `OwnerRequiredMixin` all enforce their permission checks **before**
   calling `super().dispatch()`, so the view body never executes and no

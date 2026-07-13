@@ -27,9 +27,7 @@ Customer pays ₹500
    (e.g. ₹15)  (e.g. ₹485)
 ```
 
-The platform's commission (the **platform fee**) is a small percentage of
-each order — configurable per restaurant, with a sensible default that
-applies to everyone unless overridden. The rest is the restaurant's money,
+The platform's commission (the **platform fee**) can be configured as a percentage, a fixed amount per order, or a hybrid of both — with a sensible default that applies to everyone unless explicitly overridden for a specific restaurant. The rest is the restaurant's money,
 tracked as their **balance** inside Dineflow.
 
 ## Why "we trust the database" isn't good enough
