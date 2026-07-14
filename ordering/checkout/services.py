@@ -17,7 +17,7 @@ from django.conf import settings
 from django.utils import timezone
 import bleach
 
-from core.models import MenuItem, AddOn, MenuItemAddOn, PlatformFeeRecord, PlatformSettings
+from core.models import MenuItem, AddOn, MenuItemAddOn, PlatformFeeRecord
 from ordering.models import Order, OrderItem, OrderItemAddOn, RestaurantOrderCounter, StockReservation, WorkStatus
 from ordering.exceptions import CartError, PaymentConfigurationError
 from ordering.inventory.services import _lock_and_decrement_stock, _create_stock_reservations

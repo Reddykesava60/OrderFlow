@@ -8,16 +8,21 @@ All notable changes to this project will be documented in this file.
 - **KDS Menu Shortcut**: Added a "KDS" shortcut button on the public menu for logged-in staff and owners, and an "Open Menu" button in the KDS header, allowing quick seamless navigation between the public ordering page and the kitchen display.
 - **Staff Auto-Collect feature**: The checkout system now recognizes when an authenticated staff member (with cash collection permissions) places a "CASH" order. The order automatically skips the `UNPAID` state, immediately jumps to `PENDING` (ready for the kitchen), and logs the cash collection securely without requiring manual interaction on the KDS Payments tab.
 - **QR Code Footer**: Added a professional "POWERED BY ORDER-FLOW" footer to dynamically generated restaurant QR codes, utilizing the active theme colors.
-- **Hybrid Fee Mode**: Added a new `HYBRID` mode for `PlatformSettings` that calculates platform fees as both a percentage AND a fixed amount per order to protect margins on low-value orders.
-- **Per-Restaurant Custom Fees**: Replaced the limited `commission_rate` field with a robust per-restaurant override system allowing administrators to set custom fee modes (Percentage, Fixed, or Hybrid) alongside custom amounts exclusively for specific restaurants.
+- **Per-Restaurant Custom Fees**: Completely removed the global `PlatformSettings` singleton model. Platform fee configurations (`fee_mode`, `fee_percent`, `fee_fixed_amount`) are now strictly localized to the `Restaurant` model, permanently removing default global fallback logic to improve database performance and simplify pricing configuration.
+- **Hybrid Fee Mode**: Added a new `HYBRID` fee mode that calculates platform fees as both a percentage AND a fixed amount per order to protect margins on low-value orders.
 - **Admin Exports**: Added bulk CSV export capabilities to the `MonthlyPlatformFeeStatement` and `Order` models in the Django admin panel for easier accounting.
 
 ### Changed
 - **Brand Theme**: Updated the primary brand color palette in `tailwind.config.js` to a clean, professional blue standard.
 - **KDS Architecture**: Completely removed the historical "All Orders" tab and the `allow_view_all_orders` permission flag. The KDS payload generation now strictly queries only active orders (`UNPAID`, `PREP_STARTED`, `READY`), vastly improving database query performance and reducing JSON payload sizes.
+- **Cash Timeout Configuration**: Removed the global platform cash timeout setting and migrated the configuration entirely to the `RestaurantConfig` model, removing database lookups to the singleton and enforcing per-restaurant timing logic.
 - **KDS Layout & UI**: 
-  - Adjusted individual KDS item action buttons (e.g., "Mark Done") to float on the right side of their respective rows, visually separating them from the "Complete All" order-level buttons.
+  - Overhauled the order item card layout on mobile devices, removing vertical bloat by enforcing a single-row flex layout.
+  - Compacted the station filter buttons and the new horizontal aggregated items strip for a slimmer, more space-efficient design.
+  - Repositioned the bottom navigation tab counts to sit adjacent to the labels (instead of below them) to save vertical screen real estate.
+  - Replaced the "Open Menu" and "Kitchen Queue" text with cleaner variants, completely hiding the header block on the main queue to maximize visible order space.
   - Simplified the spice level display across the KDS to show only pepper icons (🌶️) instead of redundant text labels.
+  - Added add-ons to the Pay tab order cards.
   - Standardized the order number badge styling across all KDS screens for visual consistency.
 - **Receipt UI**: Payment methods are now color-coded, and the Owner receipt view dynamically routes the user back to their origin page (either Dashboard or Payments tab) via the `?next` URL parameter.
 - **Admin Dashboard**: Ensured bulk actions in the Django admin panel (`RestaurantAdmin`) use clear "Deactivate " and "Activate" terminology. Deactivating a restaurant immediately shuts down its public menu and business operations.

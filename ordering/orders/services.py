@@ -12,7 +12,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction, models as db_models
 from django.utils import timezone
 
-from core.models import PlatformSettings, PlatformFeeRecord, Restaurant
+from core.models import PlatformFeeRecord, Restaurant
 from ordering.models import Order, OrderItem, OrderItemAddOn, RestaurantOrderCounter, WorkStatus
 from kitchen.models import PaymentEvent
 from kitchen.services import trigger_kds_refresh
@@ -25,21 +25,17 @@ TWO_PLACES = Decimal('0.01')
 
 def _compute_platform_fee(order_total, restaurant=None):
     """
-    Compute platform fee according to platform settings policy or restaurant overrides.
+    Compute platform fee according to restaurant settings policy.
     Returns (fee_amount, fee_rate_snapshot).
     """
-    settings_obj = PlatformSettings.get_solo()
-    
-    if restaurant and restaurant.custom_fee_mode:
-        mode = restaurant.custom_fee_mode
-        percent = restaurant.custom_fee_percent if restaurant.custom_fee_percent is not None else settings_obj.platform_fee_percent
-        fixed = restaurant.custom_fee_fixed_amount if restaurant.custom_fee_fixed_amount is not None else settings_obj.platform_fee_fixed_amount
-    else:
-        mode = settings_obj.platform_fee_mode
-        percent = settings_obj.platform_fee_percent
-        fixed = settings_obj.platform_fee_fixed_amount
+    if not restaurant:
+        return (Decimal('0.00'), Decimal('0.00'))
 
-    if mode == PlatformSettings.FeeMode.FIXED:
+    mode = restaurant.fee_mode
+    percent = restaurant.fee_percent
+    fixed = restaurant.fee_fixed_amount
+
+    if mode == Restaurant.FeeMode.FIXED:
         fee_amount = Decimal(fixed).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
         if order_total > Decimal('0.00'):
             fee_rate_snapshot = (fee_amount * Decimal('100') / order_total).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -47,7 +43,7 @@ def _compute_platform_fee(order_total, restaurant=None):
             fee_rate_snapshot = Decimal('0.00')
         return (fee_amount, fee_rate_snapshot)
     
-    if mode == PlatformSettings.FeeMode.HYBRID:
+    if mode == Restaurant.FeeMode.HYBRID:
         fixed_part = Decimal(fixed)
         percent_rate = Decimal(percent)
         fee_amount = ((order_total * percent_rate / Decimal('100')) + fixed_part).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -77,10 +73,8 @@ def _next_order_number(restaurant):
     counter.save(update_fields=['last_number', 'last_reset'])
     return counter.last_number
 
-def get_cash_payment_timeout_minutes(restaurant=None):
-    if restaurant and hasattr(restaurant, 'config') and restaurant.config.cash_payment_timeout_minutes_override is not None:
-        return restaurant.config.cash_payment_timeout_minutes_override
-    return PlatformSettings.get_solo().cash_payment_timeout_minutes
+def get_cash_payment_timeout_minutes(restaurant):
+    return restaurant.config.cash_payment_timeout_minutes
 
 def _expire_unpaid_cash_order_locked(order):
     """
@@ -208,7 +202,7 @@ def confirm_cash_payment(order, staff_user):
     UNPAID → PENDING + PaymentEvent(CASH_COLLECTED) + PlatformFeeRecord — all atomic.
     Returns (order, fee_amount).
     """
-    timeout_minutes = get_cash_payment_timeout_minutes()
+    timeout_minutes = get_cash_payment_timeout_minutes(order.restaurant)
     timeout_cutoff = timezone.now() - timezone.timedelta(minutes=timeout_minutes)
     if order.created_at < timeout_cutoff:
         expire_unpaid_cash_order(order)

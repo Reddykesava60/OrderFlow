@@ -352,6 +352,7 @@ class KDSPollView(ActiveStaffMixin, View):
                             "name": item.menu_item_name,
                             "qty": item.quantity,
                             "is_parcel": item.dining_option == item.DiningOption.PARCEL,
+                            "addons": _addon_preview(list(item.addons.all())),
                         }
                         for item in order.items.all()
                     ],

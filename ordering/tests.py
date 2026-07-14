@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from core.models import MenuItem, PlatformSettings, Restaurant
+from core.models import MenuItem, Restaurant
 from core.models import PlatformFeeRecord
 from kitchen.models import PaymentEvent
 
@@ -37,7 +37,7 @@ class CashTimeoutTests(TestCase):
             allow_cash_collection=True,
         )
 
-        settings_obj = PlatformSettings.get_solo()
+        # Fee mode is PERCENTAGE by default
         settings_obj.cash_payment_timeout_minutes = 10
         settings_obj.save(update_fields=['cash_payment_timeout_minutes'])
 
@@ -112,11 +112,10 @@ class PlatformFeePolicyTests(TestCase):
         )
 
     def test_fixed_platform_fee_used_for_confirmed_cash_payment(self):
-        settings_obj = PlatformSettings.get_solo()
-        settings_obj.platform_fee_mode = PlatformSettings.FeeMode.FIXED
-        settings_obj.platform_fee_fixed_amount = Decimal('12.00')
-        settings_obj.platform_fee_percent = Decimal('3.00')
-        settings_obj.save(update_fields=['platform_fee_mode', 'platform_fee_fixed_amount', 'platform_fee_percent'])
+        self.restaurant.fee_mode = Restaurant.FeeMode.FIXED
+        self.restaurant.fee_fixed_amount = Decimal('12.00')
+        self.restaurant.fee_percent = Decimal('3.00')
+        self.restaurant.save()
 
         order = place_cash_order(
             self.restaurant,
@@ -138,11 +137,10 @@ class PlatformFeePolicyTests(TestCase):
         self.assertEqual(fee_record.fee_amount, Decimal('12.00'))
 
     def test_hybrid_platform_fee_used_for_confirmed_cash_payment(self):
-        settings_obj = PlatformSettings.get_solo()
-        settings_obj.platform_fee_mode = PlatformSettings.FeeMode.HYBRID
-        settings_obj.platform_fee_fixed_amount = Decimal('2.00')
-        settings_obj.platform_fee_percent = Decimal('5.00')
-        settings_obj.save(update_fields=['platform_fee_mode', 'platform_fee_fixed_amount', 'platform_fee_percent'])
+        self.restaurant.fee_mode = Restaurant.FeeMode.HYBRID
+        self.restaurant.fee_percent = Decimal('5.00')
+        self.restaurant.fee_fixed_amount = Decimal('2.00')
+        self.restaurant.save()
 
         order = place_cash_order(
             self.restaurant,
@@ -164,18 +162,12 @@ class PlatformFeePolicyTests(TestCase):
         # 5% of 25.00 = 1.25. Fixed = 2.00. Total = 3.25.
         self.assertEqual(fee_record.fee_amount, Decimal('3.25'))
 
-    def test_restaurant_custom_fee_override_used_instead_of_platform_settings(self):
-        settings_obj = PlatformSettings.get_solo()
-        settings_obj.platform_fee_mode = PlatformSettings.FeeMode.FIXED
-        settings_obj.platform_fee_fixed_amount = Decimal('12.00')
-        settings_obj.platform_fee_percent = Decimal('3.00')
-        settings_obj.save(update_fields=['platform_fee_mode', 'platform_fee_fixed_amount', 'platform_fee_percent'])
-
-        # Set custom fee override on restaurant to HYBRID, 4.00%, 1.00 fixed
-        self.restaurant.custom_fee_mode = PlatformSettings.FeeMode.HYBRID
-        self.restaurant.custom_fee_percent = Decimal('4.00')
-        self.restaurant.custom_fee_fixed_amount = Decimal('1.00')
-        self.restaurant.save(update_fields=['custom_fee_mode', 'custom_fee_percent', 'custom_fee_fixed_amount'])
+    def test_restaurant_fee_override_used(self):
+        # Set fee override on restaurant to HYBRID, 4.00%, 1.00 fixed
+        self.restaurant.fee_mode = Restaurant.FeeMode.HYBRID
+        self.restaurant.fee_percent = Decimal('4.00')
+        self.restaurant.fee_fixed_amount = Decimal('1.00')
+        self.restaurant.save(update_fields=['fee_mode', 'fee_percent', 'fee_fixed_amount'])
 
         order = place_cash_order(
             self.restaurant,

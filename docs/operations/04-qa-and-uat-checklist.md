@@ -80,9 +80,8 @@ Restaurant B's anything.
   [Background Jobs](../engineering/08-background-jobs.md)), the
   transaction expires and any reserved stock is released.
 - [x] **Abandoned cash order**: create a cash order and never confirm
-  payment at the counter. **Expected**: after the configured cash timeout
-  (10 minutes by default — `PlatformSettings.cash_payment_timeout_minutes`,
-  adjustable per platform) the order auto-cancels and stock is restored.
+  payment at the counter. **Timeout Expiration**
+  Wait past the designated cash timeout duration (defaults to 10 minutes — configurable via `RestaurantConfig.cash_payment_timeout_minutes` on the backend). The order auto-cancels and stock is restored.
   Don't assume this matches the UPI window — they're independently
   configured.
 

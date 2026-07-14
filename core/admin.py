@@ -12,7 +12,7 @@ import csv
 from .models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
     JournalEntry, JournalLine, MonthlyPlatformFeeStatement,
-    PlatformFeeRecord, PlatformSettings, Restaurant,
+    PlatformFeeRecord, Restaurant,
     MerchantLedgerBalance, RestaurantConfig,
     SettlementBatch, SettlementRecord, StaffFilter, User,
 )
@@ -25,7 +25,7 @@ class RestaurantConfigInline(admin.StackedInline):
     model = RestaurantConfig
     can_delete = False
     verbose_name_plural = 'Restaurant config'
-    fields = ('is_open', 'reopen_message', 'admin_cash_enabled', 'cash_enabled', 'admin_upi_enabled', 'upi_enabled', 'kds_prep_enabled', 'admin_post_payment_enabled', 'post_payment_enabled', 'cash_payment_timeout_minutes_override')
+    fields = ('is_open', 'reopen_message', 'admin_cash_enabled', 'cash_enabled', 'admin_upi_enabled', 'upi_enabled', 'kds_prep_enabled', 'admin_post_payment_enabled', 'post_payment_enabled', 'cash_payment_timeout_minutes')
 
 
 
@@ -125,33 +125,21 @@ class RestaurantAdmin(admin.ModelAdmin):
 
     @admin.display(description='Platform Fee Setting')
     def commission_rate_display(self, obj):
-        if obj.custom_fee_mode:
-            if obj.custom_fee_mode == PlatformSettings.FeeMode.PERCENTAGE:
-                return f"{obj.custom_fee_percent}% (Custom)"
-            elif obj.custom_fee_mode == PlatformSettings.FeeMode.FIXED:
-                return f"₹{obj.custom_fee_fixed_amount} (Custom)"
-            elif obj.custom_fee_mode == PlatformSettings.FeeMode.HYBRID:
-                return f"{obj.custom_fee_percent}% + ₹{obj.custom_fee_fixed_amount} (Custom)"
-        
-        settings = PlatformSettings.get_solo()
-        if settings.platform_fee_mode == PlatformSettings.FeeMode.PERCENTAGE:
-            return f"{settings.platform_fee_percent}% (Default)"
-        elif settings.platform_fee_mode == PlatformSettings.FeeMode.FIXED:
-            return f"₹{settings.platform_fee_fixed_amount} (Default)"
-        elif settings.platform_fee_mode == PlatformSettings.FeeMode.HYBRID:
-            return f"{settings.platform_fee_percent}% + ₹{settings.platform_fee_fixed_amount} (Default)"
+        if obj.fee_mode == Restaurant.FeeMode.PERCENTAGE:
+            return f"{obj.fee_percent}%"
+        elif obj.fee_mode == Restaurant.FeeMode.FIXED:
+            return f"₹{obj.fee_fixed_amount}"
+        elif obj.fee_mode == Restaurant.FeeMode.HYBRID:
+            return f"{obj.fee_percent}% + ₹{obj.fee_fixed_amount}"
         return "Unknown"
 
     @admin.display(description='Cash Timeout')
     def cash_timeout_display(self, obj):
         try:
             config = obj.config
-            override = config.cash_payment_timeout_minutes_override
+            return f"{config.cash_payment_timeout_minutes}m"
         except Exception:
-            override = None
-        if override is not None:
-            return f"{override}m"
-        return f"{PlatformSettings.get_solo().cash_payment_timeout_minutes}m (Default)"
+            return "10m"
 
     @admin.action(description='Deactivate selected restaurants')
     def deactivate_restaurants(self, request, queryset):
@@ -350,34 +338,6 @@ class MonthlyPlatformFeeStatementAdmin(admin.ModelAdmin):
 
 
 # ── Menu admins (lightweight — owners manage menu, but useful for debugging) ──
-
-@admin.register(PlatformSettings)
-class PlatformSettingsAdmin(admin.ModelAdmin):
-    list_display = [
-        'cash_payment_timeout_minutes',
-        'platform_fee_mode',
-        'platform_fee_percent',
-        'platform_fee_fixed_amount',
-        'updated_at',
-    ]
-    readonly_fields = ['singleton_key', 'updated_at']
-    fields = [
-        'cash_payment_timeout_minutes',
-        'platform_fee_mode',
-        'platform_fee_percent',
-        'platform_fee_fixed_amount',
-        'updated_at',
-    ]
-
-    def has_add_permission(self, request):
-        return not PlatformSettings.objects.exists()
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def changelist_view(self, request, extra_context=None):
-        PlatformSettings.get_solo()
-        return super().changelist_view(request, extra_context=extra_context)
 
 
 class MenuItemAddOnInline(admin.TabularInline):

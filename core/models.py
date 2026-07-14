@@ -14,95 +14,34 @@ def _clean(value):
     return bleach.clean(value, tags=[], strip=True) if value else value
 
 
-# ── Platform Settings ────────────────────────────────────────────────────────
 
-class PlatformSettings(models.Model):
+# ── Restaurant ───────────────────────────────────────────────────────────────
+
+class Restaurant(models.Model):
     class FeeMode(models.TextChoices):
         PERCENTAGE = 'PERCENTAGE', 'Percentage'
         FIXED = 'FIXED', 'Fixed per order'
         HYBRID = 'HYBRID', 'Hybrid (Percentage + Fixed)'
 
-    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
-    cash_payment_timeout_minutes = models.PositiveIntegerField(
-        default=10,
-        help_text='Minutes before an unpaid cash order expires automatically.',
-    )
-    platform_fee_mode = models.CharField(
-        max_length=20,
-        choices=FeeMode.choices,
-        default=FeeMode.PERCENTAGE,
-        help_text='Choose whether platform fee is calculated as a percentage or fixed amount per order.',
-    )
-    platform_fee_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal('3.00'),
-        help_text='Used when fee mode is Percentage or Hybrid.',
-    )
-    platform_fee_fixed_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        help_text='Used when fee mode is Fixed per order or Hybrid.',
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Platform settings'
-        verbose_name_plural = 'Platform settings'
-
-    def save(self, *args, **kwargs):
-        self.singleton_key = 1
-        if self.cash_payment_timeout_minutes < 1:
-            self.cash_payment_timeout_minutes = 1
-        if self.platform_fee_percent < 0:
-            self.platform_fee_percent = Decimal('0.00')
-        if self.platform_fee_fixed_amount < 0:
-            self.platform_fee_fixed_amount = Decimal('0.00')
-        super().save(*args, **kwargs)
-
-    @classmethod
-    def get_solo(cls):
-        settings_obj, _ = cls.objects.get_or_create(
-            singleton_key=1,
-            defaults={
-                'cash_payment_timeout_minutes': 10,
-                'platform_fee_mode': cls.FeeMode.PERCENTAGE,
-                'platform_fee_percent': Decimal('3.00'),
-                'platform_fee_fixed_amount': Decimal('0.00'),
-            },
-        )
-        return settings_obj
-
-    def __str__(self):
-        return (
-            f"Cash timeout: {self.cash_payment_timeout_minutes} min | "
-            f"Fee mode: {self.platform_fee_mode}"
-        )
-
-
-# ── Restaurant ───────────────────────────────────────────────────────────────
-
-class Restaurant(models.Model):
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name       = models.CharField(max_length=200)
     slug       = models.SlugField(max_length=60, unique=True)
     logo       = models.TextField(blank=True)  # Supabase Storage public URL
     menu_qr_code_url = models.TextField(blank=True)  # Supabase Storage public URL
     is_active  = models.BooleanField(default=True)
-    custom_fee_mode = models.CharField(
+    fee_mode = models.CharField(
         max_length=20,
-        choices=PlatformSettings.FeeMode.choices,
-        null=True, blank=True,
-        help_text='Per-restaurant fee mode override. NULL = use PlatformSettings default.',
+        choices=FeeMode.choices,
+        default=FeeMode.PERCENTAGE,
+        help_text='Per-restaurant fee mode.',
     )
-    custom_fee_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text='Per-restaurant fee percent override. Used if mode is Percentage or Hybrid.',
+    fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('3.00'),
+        help_text='Per-restaurant fee percent. Used if mode is Percentage or Hybrid.',
     )
-    custom_fee_fixed_amount = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Per-restaurant fixed fee override. Used if mode is Fixed or Hybrid.',
+    fee_fixed_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        help_text='Per-restaurant fixed fee. Used if mode is Fixed or Hybrid.',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -141,9 +80,9 @@ class RestaurantConfig(models.Model):
         default=True,
         help_text='When off, customers cannot choose "Post Payment (Account)" at checkout.',
     )
-    cash_payment_timeout_minutes_override = models.PositiveIntegerField(
-        null=True, blank=True,
-        help_text='Per-restaurant cash timeout override (minutes). NULL = use PlatformSettings default.',
+    cash_payment_timeout_minutes = models.PositiveIntegerField(
+        default=10,
+        help_text='Minutes before an unpaid cash order expires automatically.',
     )
     dpa_accepted_at = models.DateTimeField(null=True, blank=True)
 

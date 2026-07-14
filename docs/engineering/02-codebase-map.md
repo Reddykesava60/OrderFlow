@@ -36,7 +36,7 @@ docs/               You are here
 
 | File | Purpose |
 |---|---|
-| `models.py` | `Restaurant`, `RestaurantConfig`, `PlatformSettings`, `User`, `Customer`, `MenuItem`, `AddOn`, `MenuItemAddOn`, `PlatformFeeRecord`, `OwnerAuditLog`, `MonthlyPlatformFeeStatement`, and the ledger models (`MerchantLedgerBalance`, `JournalEntry`, `JournalLine`, `SettlementBatch`, `SettlementRecord`) |
+| `models.py` | `Restaurant`, `RestaurantConfig`, `User`, `Customer`, `MenuItem`, `AddOn`, `MenuItemAddOn`, `PlatformFeeRecord`, `OwnerAuditLog`, `MonthlyPlatformFeeStatement`, and the ledger models (`MerchantLedgerBalance`, `JournalEntry`, `JournalLine`, `SettlementBatch`, `SettlementRecord`) |
 | `ledger.py` | `LedgerService` — the double-entry bookkeeping engine. See [Financial Ledger](./05-financial-ledger.md) |
 | `mixins.py` | Reusable view mixins (e.g., permission checks for staff actions) |
 | `middleware.py` | Security headers, forced password-change redirect |
