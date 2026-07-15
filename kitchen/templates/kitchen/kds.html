@@ -169,6 +169,7 @@
                       <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-base font-black text-slate-900 leading-tight" x-text="unit.name"></h2>
                         <span class="text-sm font-black text-amber-600" x-text="'x' + unit.qty"></span>
+                        <span x-show="unit.is_parcel" class="text-base opacity-80" title="Parcel">&#128717;</span>
                       </div>
                       <div class="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
                       <div class="mt-2 flex flex-wrap gap-1.5">
@@ -247,6 +248,7 @@
                       <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-base font-black text-slate-900 leading-tight" x-text="unit.name"></h2>
                         <span class="text-sm font-black text-amber-600" x-text="'x' + unit.qty"></span>
+                        <span x-show="unit.is_parcel" class="text-base opacity-80" title="Parcel">&#128717;</span>
                       </div>
                       <div class="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400" x-text="unit.detail"></div>
                       <div class="mt-2 flex flex-wrap gap-1.5">
@@ -307,7 +309,10 @@
                 <template x-for="item in order.items" :key="item.id">
                   <div>
                     <div class="flex items-center justify-between gap-2 text-xs font-bold text-slate-600">
-                      <span x-text="item.qty + 'x ' + item.name"></span>
+                      <div class="flex items-center gap-1.5">
+                        <span x-text="item.qty + 'x ' + item.name"></span>
+                        <span x-show="item.is_parcel" class="text-base opacity-80" title="Parcel">&#128717;</span>
+                      </div>
                     </div>
                     <template x-if="item.addons && item.addons.length > 0">
                       <div class="mt-0.5 pl-3 space-y-0.5">
