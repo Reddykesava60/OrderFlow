@@ -12,7 +12,7 @@ import csv
 from .models import (
     AddOn, ItemType, MenuItem, MenuItemAddOn,
     JournalEntry, JournalLine, MonthlyPlatformFeeStatement,
-    PlatformFeeRecord, Restaurant,
+    PlatformFeeRecord, Restaurant, Customer,
     MerchantLedgerBalance, RestaurantConfig,
     SettlementBatch, SettlementRecord, StaffFilter, User,
 )
@@ -57,9 +57,9 @@ class RestaurantAdmin(admin.ModelAdmin):
         (None, {
             'fields': ('id', 'name', 'slug', 'logo', 'menu_qr_code_url', 'is_active', 'created_at')
         }),
-        ('Platform Fee Overrides', {
-            'fields': ('custom_fee_mode', 'custom_fee_percent', 'custom_fee_fixed_amount'),
-            'description': 'Leave mode blank to use the global Platform Settings default.',
+        ('Platform Fee Settings', {
+            'fields': ('fee_mode', 'fee_percent', 'fee_fixed_amount'),
+            'description': 'Configure the platform fee applied to each order.',
         }),
     )
 
@@ -427,3 +427,49 @@ class SettlementRecordAdmin(admin.ModelAdmin):
     readonly_fields = ('id', 'restaurant', 'batch', 'amount', 'status', 'provider_transfer_id', 'created_at', 'updated_at')
 
 
+
+# ── Customer Admin ───────────────────────────────────────────────────────────
+
+from django import forms
+from django.contrib.auth.hashers import make_password
+
+class CustomerAdminForm(forms.ModelForm):
+    pin = forms.CharField(widget=forms.PasswordInput(), help_text="Set a 4-digit PIN for the customer. Leave blank to keep current PIN.", required=False)
+
+    class Meta:
+        model = Customer
+        fields = '__all__'
+
+    def save(self, commit=True):
+        customer = super().save(commit=False)
+        pin_val = self.cleaned_data.get('pin')
+        
+        if pin_val:
+            from core.services import validate_customer_pin_value
+            validate_customer_pin_value(pin_val)
+            customer.pin = make_password(pin_val, hasher='customer_pin')
+            customer.must_change_pin = False
+        else:
+            if self.instance.pk:
+                original = Customer.objects.get(pk=self.instance.pk)
+                customer.pin = original.pin
+                
+        if not customer.serial_number:
+            from core.services import _next_customer_serial
+            customer.serial_number = _next_customer_serial(customer.restaurant)
+        if commit:
+            customer.save()
+        return customer
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    form = CustomerAdminForm
+    list_display = ['serial_number', 'name', 'phone', 'restaurant', 'balance', 'credit_limit', 'is_blocked', 'admin_post_payment_enabled', 'is_post_payment_enabled', 'created_at']
+    list_filter = ['restaurant', 'is_blocked', 'admin_post_payment_enabled', 'is_post_payment_enabled']
+    search_fields = ['name', 'phone', 'serial_number']
+    readonly_fields = ['serial_number', 'balance', 'created_at', 'updated_at', 'id']
+    
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ['restaurant']
+        return self.readonly_fields

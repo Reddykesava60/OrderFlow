@@ -23,8 +23,7 @@ paper than it is in practice.
 - **Customers** (for the post-payment/tab feature) authenticate with a
   restaurant-scoped serial number + PIN, not a password. PINs are hashed
   with a dedicated hasher (`core.hashers.CustomerPINHasher`, PBKDF2 with
-  260,000 iterations) precisely because PINs are short and low-entropy —
-  using a deliberately expensive hash compensates for that.
+  20,000 iterations). Iterations are intentionally kept lower than standard passwords to ensure instantaneous validation in performance-constrained local environments without compromising reasonable security for a 4-digit PIN.
 - **Customers checking their own payment status or retrying a payment**
   (no session at all, since they never log in) use a signed, per-payment,
   time-limited access token instead — see
@@ -145,7 +144,7 @@ in two specific misconfiguration scenarios, rather than degrading silently:
 
 ## Audit trail
 
-`OwnerAuditLog` records sensitive owner/staff actions (creating or editing
+`OwnerAuditLog` records sensitive owner/staff actions (editing
 a customer, resetting a PIN, recording a manual payment, staff account
 changes) with a structured `details` JSON payload — useful both for
 "who did this" investigations and for satisfying a restaurant's own

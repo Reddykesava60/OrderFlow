@@ -36,43 +36,22 @@ class CustomerListApiView(OwnerRequiredMixin, View):
             'balance': float(c.balance),
             'credit_limit': float(c.credit_limit) if c.credit_limit is not None else None,
             'is_post_payment_enabled': c.is_post_payment_enabled,
+            'admin_post_payment_enabled': c.admin_post_payment_enabled,
             'is_blocked': c.is_blocked,
         } for c in customers]
         return JsonResponse({'customers': data})
 
-class CustomerCreateView(OwnerRequiredMixin, View):
-    def post(self, request):
-        try:
-            name = request.POST.get('name')
-            phone = request.POST.get('phone')
-            pin = request.POST.get('pin')
-            credit_limit_str = request.POST.get('credit_limit')
-            
-            if not name or not phone or not pin:
-                return JsonResponse({'error': 'Name, phone, and PIN are required.'}, status=400)
-                
-            credit_limit = None
-            if credit_limit_str:
-                credit_limit = Decimal(credit_limit_str)
-                
-            customer = create_customer(
-                restaurant=request.user.restaurant,
-                name=name,
-                phone=phone,
-                pin=pin,
-                credit_limit=credit_limit,
-                owner_user=request.user
-            )
-            return JsonResponse({'success': True, 'customer_id': str(customer.id)})
-        except Exception as e:
-            logger.exception("Error creating customer")
-            return JsonResponse({'error': str(e)}, status=400)
+
 
 class CustomerEditView(OwnerRequiredMixin, View):
     def post(self, request, customer_id):
         customer = get_object_or_404(Customer, id=customer_id, restaurant=request.user.restaurant)
         try:
             is_post_payment_enabled = request.POST.get('is_post_payment_enabled') == 'true'
+            
+            if is_post_payment_enabled and not customer.admin_post_payment_enabled:
+                return JsonResponse({'error': 'Platform administrator has disabled post-payment for this customer.'}, status=403)
+                
             is_blocked = request.POST.get('is_blocked') == 'true'
             credit_limit_str = request.POST.get('credit_limit')
             

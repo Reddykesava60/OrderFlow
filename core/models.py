@@ -161,6 +161,10 @@ class Customer(models.Model):
     must_change_pin = models.BooleanField(default=True)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    admin_post_payment_enabled = models.BooleanField(
+        default=True,
+        help_text='Platform toggle. If False, this customer cannot use post-payments regardless of owner settings.'
+    )
     is_post_payment_enabled = models.BooleanField(default=True)
     is_blocked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -44,7 +44,6 @@ urlpatterns = [
     # Customers
     path('customers/', views_customers.CustomerListView.as_view(), name='customers'),
     path('customers/api/', views_customers.CustomerListApiView.as_view(), name='customers_api'),
-    path('customers/add/', views_customers.CustomerCreateView.as_view(), name='customer_add'),
     path('customers/<uuid:customer_id>/edit/', views_customers.CustomerEditView.as_view(), name='customer_edit'),
     path('customers/<uuid:customer_id>/payment/', views_customers.CustomerPaymentView.as_view(), name='customer_payment'),
     path('customers/<uuid:customer_id>/ledger/', views_customers.CustomerLedgerView.as_view(), name='customer_ledger'),

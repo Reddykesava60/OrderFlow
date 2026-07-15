@@ -8,4 +8,4 @@ class CustomerPINHasher(PBKDF2PasswordHasher):
     Existing hashes keep verifying with the iteration count encoded in the hash.
     """
     algorithm = "customer_pin"
-    iterations = 260000
+    iterations = 20000

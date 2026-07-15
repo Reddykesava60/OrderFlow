@@ -6,9 +6,6 @@
 <div class="space-y-6" x-data="customerDashboard()">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-900">Post-Payment Customers</h1>
-        <button @click="openCreateModal" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">
-            + New Customer
-        </button>
     </div>
 
     <!-- Error/Success Alerts -->
@@ -83,24 +80,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h3 class="mt-2 text-sm font-medium text-gray-900">No customers</h3>
-            <p class="mt-1 text-sm text-gray-500">Get started by creating a new customer.</p>
-        </div>
-    </div>
-
-    <!-- Modal: Create Customer -->
-    <div x-show="createModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50" style="display: none;">
-        <div class="bg-white p-6 rounded border border-gray-200 w-96">
-            <h2 class="text-xl font-bold mb-4">New Customer</h2>
-            <div class="space-y-4">
-                <div><label for="create_name" class="block text-sm">Name</label><input id="create_name" name="name" type="text" x-model="form.name" class="w-full border rounded p-2"></div>
-                <div><label for="create_phone" class="block text-sm">Phone</label><input id="create_phone" name="phone" type="text" x-model="form.phone" class="w-full border rounded p-2"></div>
-                <div><label for="create_pin" class="block text-sm">Temporary PIN</label><input id="create_pin" name="pin" type="password" x-model="form.pin" class="w-full border rounded p-2"></div>
-                <div><label for="create_limit" class="block text-sm">Credit Limit (Leave blank for unlimited)</label><input id="create_limit" name="credit_limit" type="number" x-model="form.credit_limit" class="w-full border rounded p-2"></div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-2">
-                <button @click="createModal = false" class="px-4 py-2 border rounded">Cancel</button>
-                <button @click="submitCreate" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
-            </div>
         </div>
     </div>
 
@@ -119,8 +98,8 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-2">
-                <button @click="paymentModal = false" class="px-4 py-2 border rounded">Cancel</button>
-                <button @click="submitPayment" class="px-4 py-2 bg-green-600 text-white rounded">Submit</button>
+                <button @click="paymentModal = false" class="px-4 py-2 border rounded" :disabled="isPaying">Cancel</button>
+                <button @click="submitPayment" class="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isPaying" x-text="isPaying ? 'Submitting...' : 'Submit'"></button>
             </div>
         </div>
     </div>
@@ -130,9 +109,10 @@
             <h2 class="text-xl font-bold mb-4">Edit Customer</h2>
             <div class="space-y-4">
                 <label for="edit_post_payment" class="flex items-center space-x-2">
-                    <input id="edit_post_payment" name="is_post_payment_enabled" type="checkbox" x-model="editForm.is_post_payment_enabled" class="rounded border-gray-300">
+                    <input id="edit_post_payment" name="is_post_payment_enabled" type="checkbox" x-model="editForm.is_post_payment_enabled" :disabled="!selectedCustomer.admin_post_payment_enabled" class="rounded border-gray-300 disabled:opacity-50">
                     <span class="text-sm">Enable Post-Payment</span>
                 </label>
+                <p x-show="!selectedCustomer.admin_post_payment_enabled" class="text-xs text-red-500 mt-1">Platform administrator has disabled post-payment for this customer.</p>
                 <label for="edit_blocked" class="flex items-center space-x-2">
                     <input id="edit_blocked" name="is_blocked" type="checkbox" x-model="editForm.is_blocked" class="rounded border-gray-300 text-red-600">
                     <span class="text-sm text-red-600 font-medium">Block Customer</span>
@@ -143,8 +123,8 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-2">
-                <button @click="editModal = false" class="px-4 py-2 border rounded">Cancel</button>
-                <button @click="submitEdit" class="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+                <button @click="editModal = false" class="px-4 py-2 border rounded" :disabled="isEditing">Cancel</button>
+                <button @click="submitEdit" class="px-4 py-2 bg-indigo-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isEditing" x-text="isEditing ? 'Saving...' : 'Save'"></button>
             </div>
         </div>
     </div>
@@ -160,8 +140,8 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-2">
-                <button @click="pinModal = false" class="px-4 py-2 border rounded">Cancel</button>
-                <button @click="submitPin" class="px-4 py-2 bg-yellow-600 text-white rounded">Reset</button>
+                <button @click="pinModal = false" class="px-4 py-2 border rounded" :disabled="isPinning">Cancel</button>
+                <button @click="submitPin" class="px-4 py-2 bg-yellow-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" :disabled="isPinning" x-text="isPinning ? 'Resetting...' : 'Reset'"></button>
             </div>
         </div>
     </div>
@@ -194,7 +174,12 @@
                                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500" x-text="entry.description"></td>
                             </tr>
                         </template>
-                        <tr x-show="ledgerEntries.length === 0">
+                        <tr x-show="isLoadingLedger">
+                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
+                                <span class="inline-block animate-spin mr-2">&#8987;</span> Loading ledger...
+                            </td>
+                        </tr>
+                        <tr x-show="!isLoadingLedger && ledgerEntries.length === 0">
                             <td colspan="5" class="px-4 py-4 text-center text-sm text-gray-500">No transactions found.</td>
                         </tr>
                     </tbody>
@@ -224,6 +209,10 @@ function customerDashboard() {
         paymentForm: { amount: '', method: 'Cash' },
         editForm: { is_post_payment_enabled: true, is_blocked: false, credit_limit: '' },
         pinForm: { new_pin: '' },
+        isEditing: false,
+        isPinning: false,
+        isPaying: false,
+        isLoadingLedger: false,
 
         init() {
             this.fetchCustomers();
@@ -238,34 +227,7 @@ function customerDashboard() {
                 this.errorMsg = 'Failed to load customers.';
             }
         },
-        
-        openCreateModal() {
-            this.form = { name: '', phone: '', pin: '', credit_limit: '' };
-            this.createModal = true;
-        },
-        
-        async submitCreate() {
-            const formData = new FormData();
-            formData.append('name', this.form.name);
-            formData.append('phone', this.form.phone);
-            formData.append('pin', this.form.pin);
-            if (this.form.credit_limit) formData.append('credit_limit', this.form.credit_limit);
-            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-            
-            try {
-                const res = await fetch("{% url 'owner:customer_add' %}", { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.success) {
-                    this.createModal = false;
-                    this.successMsg = 'Customer created!';
-                    this.fetchCustomers();
-                } else {
-                    this.errorMsg = data.error;
-                }
-            } catch (e) {
-                this.errorMsg = 'Request failed.';
-            }
-        },
+
 
         openPaymentModal(c) {
             this.selectedCustomer = c;
@@ -274,6 +236,10 @@ function customerDashboard() {
         },
         
         async submitPayment() {
+            if (this.isPaying) return;
+            this.isPaying = true;
+            this.errorMsg = '';
+            
             const formData = new FormData();
             formData.append('amount', this.paymentForm.amount);
             formData.append('payment_method', this.paymentForm.method);
@@ -292,6 +258,8 @@ function customerDashboard() {
                 }
             } catch (e) {
                 this.errorMsg = 'Request failed.';
+            } finally {
+                this.isPaying = false;
             }
         },
         
@@ -306,6 +274,10 @@ function customerDashboard() {
         },
         
         async submitEdit() {
+            if (this.isEditing) return;
+            this.isEditing = true;
+            this.errorMsg = '';
+            
             const formData = new FormData();
             formData.append('is_post_payment_enabled', this.editForm.is_post_payment_enabled);
             formData.append('is_blocked', this.editForm.is_blocked);
@@ -327,6 +299,8 @@ function customerDashboard() {
                 }
             } catch (e) {
                 this.errorMsg = 'Request failed.';
+            } finally {
+                this.isEditing = false;
             }
         },
 
@@ -337,6 +311,10 @@ function customerDashboard() {
         },
         
         async submitPin() {
+            if (this.isPinning) return;
+            this.isPinning = true;
+            this.errorMsg = '';
+            
             const formData = new FormData();
             formData.append('new_pin', this.pinForm.new_pin);
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
@@ -353,6 +331,8 @@ function customerDashboard() {
                 }
             } catch (e) {
                 this.errorMsg = 'Request failed.';
+            } finally {
+                this.isPinning = false;
             }
         },
 
@@ -360,6 +340,7 @@ function customerDashboard() {
             this.selectedCustomer = c;
             this.ledgerEntries = [];
             this.ledgerModal = true;
+            this.isLoadingLedger = true;
             
             try {
                 const url = "{% url 'owner:customer_ledger' customer_id='00000000-0000-0000-0000-000000000000' %}".replace('00000000-0000-0000-0000-000000000000', this.selectedCustomer.id);
@@ -368,6 +349,8 @@ function customerDashboard() {
                 this.ledgerEntries = data.entries;
             } catch (e) {
                 this.errorMsg = 'Failed to load ledger.';
+            } finally {
+                this.isLoadingLedger = false;
             }
         }
     }

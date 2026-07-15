@@ -281,7 +281,7 @@ def place_post_payment_order(restaurant, cart_lines, customer, plain_pin, table_
     from ordering.models import LedgerEntry
     if customer.is_blocked:
         raise CartError('CUSTOMER_BLOCKED', 'This account is currently blocked.')
-    if not customer.is_post_payment_enabled:
+    if not customer.is_post_payment_enabled or not customer.admin_post_payment_enabled:
         raise CartError('POST_PAYMENT_DISABLED', 'Post-Payment is not enabled for this account.')
     t0 = time.time()
     pin_ok = verify_customer_pin(customer, plain_pin)

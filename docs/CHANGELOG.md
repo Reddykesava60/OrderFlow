@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - Recent Updates
 
 ### Added
+- **Platform-Level Post-Payment Control**: Added `admin_post_payment_enabled` toggle to the platform admin, allowing admins to selectively disable post-payment for specific customers.
+- **UI Responsiveness**: Added instant loading states (visual feedback) to the Owner Dashboard Modals (Edit Customer, Reset PIN, Record Payment, and Ledger) to improve the user experience.
 - **KDS Menu Shortcut**: Added a "KDS" shortcut button on the public menu for logged-in staff and owners, and an "Open Menu" button in the KDS header, allowing quick seamless navigation between the public ordering page and the kitchen display.
 - **Staff Auto-Collect feature**: The checkout system now recognizes when an authenticated staff member (with cash collection permissions) places a "CASH" order. The order automatically skips the `UNPAID` state, immediately jumps to `PENDING` (ready for the kitchen), and logs the cash collection securely without requiring manual interaction on the KDS Payments tab.
 - **QR Code Footer**: Added a professional "POWERED BY ORDER-FLOW" footer to dynamically generated restaurant QR codes, utilizing the active theme colors.
@@ -13,9 +15,13 @@ All notable changes to this project will be documented in this file.
 - **Admin Exports**: Added bulk CSV export capabilities to the `MonthlyPlatformFeeStatement` and `Order` models in the Django admin panel for easier accounting.
 
 ### Changed
+- **Customer Creation Workflow**: Migrated customer creation entirely to the platform admin. Removed the "New Customer" button from the owner dashboard to centralize control and ensure only administrators can create post-payment accounts.
 - **Brand Theme**: Updated the primary brand color palette in `tailwind.config.js` to a clean, professional blue standard.
 - **KDS Architecture**: Completely removed the historical "All Orders" tab and the `allow_view_all_orders` permission flag. The KDS payload generation now strictly queries only active orders (`UNPAID`, `PREP_STARTED`, `READY`), vastly improving database query performance and reducing JSON payload sizes.
 - **Cash Timeout Configuration**: Removed the global platform cash timeout setting and migrated the configuration entirely to the `RestaurantConfig` model, removing database lookups to the singleton and enforcing per-restaurant timing logic.
+
+### Performance & Security
+- **PIN Hashing Optimization**: Drastically reduced the PBKDF2 hash iterations for Customer PINs (from 260,000 to 20,000) to ensure lightning-fast checkout performance in constrained or local development environments, without compromising reasonable security for a 4-digit PIN.
 - **KDS Layout & UI**: 
   - Overhauled the order item card layout on mobile devices, removing vertical bloat by enforcing a single-row flex layout.
   - Compacted the station filter buttons and the new horizontal aggregated items strip for a slimmer, more space-efficient design.

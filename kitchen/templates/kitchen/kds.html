@@ -156,7 +156,6 @@
               <template x-for="unit in order.visible_work_units" :key="unit.id">
                 <div class="relative flex items-center justify-between gap-3 p-3 transition-colors duration-500"
                      :class="[unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-brand-100', successStates['start-' + unit.kind + '-' + unit.id] ? 'bg-emerald-50/60' : '']">
-                  <span x-show="unit.is_parcel" class="absolute top-2 right-2 text-lg opacity-80" title="Parcel">&#128717;</span>
                   <div class="flex min-w-0 flex-1 items-center gap-3">
                     <div class="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                       <template x-if="unit.image_url">
@@ -235,7 +234,6 @@
               <template x-for="unit in order.visible_work_units" :key="unit.id">
                 <div class="relative flex items-center justify-between gap-3 p-3 transition-colors duration-500"
                      :class="[unit.has_addons ? 'border-l-4 border-emerald-400 bg-emerald-50/20' : 'border-l-4 border-amber-200', successStates['done-' + unit.kind + '-' + unit.id] ? 'bg-emerald-50/60' : '']">
-                  <span x-show="unit.is_parcel" class="absolute top-2 right-2 text-lg opacity-80" title="Parcel">&#128717;</span>
                   <div class="flex min-w-0 flex-1 items-center gap-3">
                     <div class="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                       <template x-if="unit.image_url">
@@ -310,7 +308,6 @@
                   <div>
                     <div class="flex items-center justify-between gap-2 text-xs font-bold text-slate-600">
                       <span x-text="item.qty + 'x ' + item.name"></span>
-                      <span x-show="item.is_parcel" class="text-base opacity-80">&#128717;</span>
                     </div>
                     <template x-if="item.addons && item.addons.length > 0">
                       <div class="mt-0.5 pl-3 space-y-0.5">
