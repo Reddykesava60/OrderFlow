@@ -64,17 +64,17 @@
       <div class="mx-auto flex max-w-6xl items-stretch">
         <button class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
                 :class="tab === 'kitchen' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
-                @click="tab = 'kitchen'">
+                @click="tab = 'kitchen'; selectedAggregatedItem = null">
           Kitchen <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.kitchen > 0" x-text="counts.kitchen"></span>
         </button>
         <button x-show="kdsPrepEnabled" class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
                 :class="tab === 'preparing' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
-                @click="tab = 'preparing'">
+                @click="tab = 'preparing'; selectedAggregatedItem = null">
           Preparing <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.preparing > 0" x-text="counts.preparing"></span>
         </button>
         <button x-show="canCollect" class="flex-1 border-b-2 px-4 py-4 text-xs font-black uppercase tracking-widest transition"
                 :class="tab === 'payments' ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-transparent text-slate-400 hover:text-slate-700'"
-                @click="tab = 'payments'">
+                @click="tab = 'payments'; selectedAggregatedItem = null">
           Payments <span class="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px]" x-show="counts.payments > 0" x-text="counts.payments"></span>
         </button>
       </div>
@@ -99,9 +99,11 @@
     <div class="border-b border-slate-200 bg-slate-50" x-show="loaded && (tab === 'kitchen' || tab === 'preparing') && aggregatedItems().length > 0" x-cloak>
       <div class="mx-auto flex w-full max-w-6xl gap-3 overflow-x-auto px-4 py-2 md:px-6 hide-scrollbar">
         <template x-for="item in aggregatedItems()" :key="item.menu_item_id || item.id">
-          <div class="relative flex flex-shrink-0 flex-col items-center gap-1 w-16">
-            <div class="relative">
-              <div class="h-12 w-12 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div class="relative flex flex-shrink-0 flex-col items-center gap-1 w-16 cursor-pointer"
+               @click="selectedAggregatedItem = (selectedAggregatedItem === (item.menu_item_id || item.id) ? null : (item.menu_item_id || item.id))">
+            <div class="relative rounded-xl border transition-colors"
+                 :class="selectedAggregatedItem === (item.menu_item_id || item.id) ? 'ring-2 ring-brand-500 border-brand-500' : 'border-slate-200'">
+              <div class="h-12 w-12 overflow-hidden rounded-xl bg-white shadow-sm">
                 <template x-if="item.image_url">
                   <img :src="item.image_url" class="h-full w-full object-cover" alt="">
                 </template>
@@ -109,9 +111,16 @@
                   <div class="flex h-full w-full items-center justify-center text-[8px] font-black uppercase text-slate-300">No Img</div>
                 </template>
               </div>
-              <div class="absolute flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white" style="top: -6px; right: -6px;" x-text="item.total_qty"></div>
+              <template x-if="item.dinein_qty > 0">
+                <div class="absolute flex h-5 w-5 items-center justify-center rounded-full bg-brand-700 text-[10px] font-black text-white shadow-sm ring-2 ring-white" style="top: -6px; left: -6px;" x-text="item.dinein_qty" title="Dine In"></div>
+              </template>
+              <template x-if="item.parcel_qty > 0">
+                <div class="absolute flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white" style="top: -6px; right: -6px;" x-text="item.parcel_qty" title="Parcel"></div>
+              </template>
             </div>
-            <div class="w-full truncate text-center text-[9px] font-bold uppercase tracking-wider text-slate-600" x-text="item.name" :title="item.name"></div>
+            <div class="w-full truncate text-center text-[9px] font-bold uppercase tracking-wider transition-colors"
+                 :class="selectedAggregatedItem === (item.menu_item_id || item.id) ? 'text-brand-700' : 'text-slate-600'"
+                 x-text="item.name" :title="item.name"></div>
           </div>
         </template>
       </div>
@@ -130,7 +139,7 @@
       </div>
 
       <section x-show="tab === 'kitchen' && loaded" x-cloak class="grid gap-4 lg:grid-cols-2 items-start">
-        <template x-for="order in filteredOrders(kitchen)" :key="order.id">
+        <template x-for="order in displayOrders(kitchen)" :key="order.id">
           <article class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
             <div class="flex flex-row items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
               <div class="flex items-center gap-3">
@@ -203,13 +212,13 @@
           </article>
         </template>
 
-        <div x-show="filteredOrders(kitchen).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+        <div x-show="displayOrders(kitchen).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
           No pending orders
         </div>
       </section>
 
       <section x-show="tab === 'preparing' && loaded && kdsPrepEnabled" x-cloak class="grid gap-4 lg:grid-cols-2 items-start">
-        <template x-for="order in filteredOrders(preparing)" :key="order.id">
+        <template x-for="order in displayOrders(preparing)" :key="order.id">
           <article class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
             <div class="flex flex-row items-center justify-between gap-3 border-b border-slate-100 bg-amber-50/50 px-4 py-3">
               <div class="flex items-center gap-3">
@@ -282,7 +291,7 @@
           </article>
         </template>
 
-        <div x-show="filteredOrders(preparing).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
+        <div x-show="displayOrders(preparing).length === 0" class="rounded-[2rem] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm font-bold uppercase tracking-widest text-slate-400">
           Nothing currently preparing
         </div>
       </section>
@@ -398,6 +407,7 @@
         tab: 'kitchen',
         staffFilters: [],
         selectedFilter: 'all',
+        selectedAggregatedItem: null,
         kitchen: [],
         preparing: [],
         payments: [],
@@ -505,6 +515,7 @@
 
         showToast(msg, type) {
           type = type || 'error';
+          if (type === 'success') return; // disabled success toasts for better performance
           const id = ++this.toastCounter;
           const toast = { id, msg, type, visible: true };
           this.toasts.push(toast);
@@ -582,6 +593,19 @@
             .filter((order) => order.visible_items.length > 0);
         },
 
+        displayOrders(orders) {
+          let baseOrders = this.filteredOrders(orders);
+          if (this.selectedAggregatedItem) {
+            baseOrders = baseOrders.filter((order) =>
+              (order.visible_work_units || []).some(unit => (unit.menu_item_id || unit.id) === this.selectedAggregatedItem)
+            ).map((order) => ({
+              ...order,
+              visible_work_units: (order.visible_work_units || []).filter(unit => (unit.menu_item_id || unit.id) === this.selectedAggregatedItem)
+            }));
+          }
+          return baseOrders;
+        },
+
         aggregatedItems() {
           const map = new Map();
           const processOrders = (orders) => {
@@ -591,9 +615,15 @@
                 if (unit.kind === 'item') {
                   const key = unit.menu_item_id || unit.id;
                   if (!map.has(key)) {
-                    map.set(key, { ...unit, total_qty: 0 });
+                    map.set(key, { ...unit, dinein_qty: 0, parcel_qty: 0, total_qty: 0 });
                   }
-                  map.get(key).total_qty += unit.qty;
+                  const agg = map.get(key);
+                  if (unit.is_parcel) {
+                    agg.parcel_qty += unit.qty;
+                  } else {
+                    agg.dinein_qty += unit.qty;
+                  }
+                  agg.total_qty += unit.qty;
                 }
               }
             }
