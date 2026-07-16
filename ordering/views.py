@@ -281,7 +281,6 @@ class CheckoutView(View):
                         return JsonResponse({
                             'error': 'INVALID_CUSTOMER_CREDENTIALS',
                             'message': 'Invalid Customer ID or PIN.',
-                            'item_name': e.item_name,
                         }, status=409)
                     raise
                 _clear_post_payment_pin_failures(request, restaurant, serial_number)
@@ -649,8 +648,6 @@ class RazorpayWebhookView(View):
                         webhook_log.id,
                     )
             return HttpResponse(status=200)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        except Exception:
             logger.exception("Razorpay webhook: unified ingestion failed")
             return HttpResponse(status=400)

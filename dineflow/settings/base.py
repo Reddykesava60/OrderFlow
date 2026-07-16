@@ -178,7 +178,7 @@ CONTENT_SECURITY_POLICY = config(
         "form-action 'self'; "
         "img-src 'self' data: https:; "
         "font-src 'self' data:; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "connect-src 'self' https://api.razorpay.com wss:; "
         "frame-src https://api.razorpay.com https://checkout.razorpay.com"
