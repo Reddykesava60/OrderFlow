@@ -224,20 +224,21 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="translate-y-0 sm:scale-100"
          x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95"
-         class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden safe-bottom">
+         class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden safe-bottom flex flex-col max-h-[90vh]">
       
-      <div class="h-1.5 w-12 bg-slate-200 rounded-full mx-auto my-3 sm:hidden"></div>
+      <div class="h-1.5 w-12 bg-slate-200 rounded-full mx-auto my-3 sm:hidden shrink-0"></div>
       
-      <div class="p-6 space-y-6">
+      <div class="p-6 space-y-6 overflow-y-auto overscroll-contain">
         <h3 class="text-xl font-black text-slate-900 tracking-tight">Your Order</h3>
 
-        <div class="max-h-[40vh] overflow-y-auto space-y-4 pr-1 divide-y divide-slate-50">
+        <div class="space-y-4 pr-1 divide-y divide-slate-50">
           <template x-for="(line, idx) in cart" :key="idx">
             <div class="flex justify-between items-start pt-4 first:pt-0">
               <div class="flex-1 min-w-0">
-                <div class="font-black text-slate-800 leading-tight">
-                   <span class="text-brand-600 mr-1" x-text="line.qty + '×'"></span><span x-text="line.name"></span>
-                </div>
+                 <div class="font-black text-slate-800 leading-tight flex items-center gap-1.5">
+                    <div><span class="text-brand-600" x-text="line.qty + '×'"></span> <span x-text="line.name"></span></div>
+                    <span x-show="line.dining === 'PARCEL'" class="text-base opacity-80" title="Parcel">&#128717;</span>
+                 </div>
                 <div class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider" x-text="lineDetail(line)"></div>
               </div>
               <div class="flex items-center gap-4 ml-4">
@@ -529,7 +530,6 @@
         },
         lineDetail(line) {
           const parts = [];
-          if (line.dining === 'PARCEL') parts.push('Parcel');
           if (line.spice) parts.push(line.spice.charAt(0) + line.spice.slice(1).toLowerCase());
           for (const a of line.addons) parts.push(a.name + ' ×' + a.quantity);
           return parts.join(' · ');
