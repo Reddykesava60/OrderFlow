@@ -177,10 +177,10 @@ CONTENT_SECURITY_POLICY = config(
         "frame-ancestors 'none'; "
         "form-action 'self'; "
         "img-src 'self' data: https:; "
-        "font-src 'self' data:; "
-        "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "connect-src 'self' https://api.razorpay.com wss:; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+        "connect-src 'self' https://api.razorpay.com wss: ws:; "
         "frame-src https://api.razorpay.com https://checkout.razorpay.com"
     ),
 )
