@@ -22,7 +22,7 @@ Built with a high-concurrency architecture using **Django 5.2 (ASGI/Daphne)**, *
 
 ## 🚀 Live Demo & Links
 
-- **Live Application**: [https://your-demo-url.com](https://your-demo-url.com)
+- **Live Application**: (https://order-flow.up.railway.app)
 - **Browse Source Code**: (https://github.com/Reddykesava60/OrderFlow)
 - **Demo Credentials**:
   - **Platform Admin**: `admin@platform.com` / `admin123`
