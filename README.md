@@ -21,7 +21,6 @@ Built with a high-concurrency architecture using **Django 5.2 (ASGI/Daphne)**, *
 ---
 
 ## 🚀 Live Demo & Links
-
 - **Live Application**: (https://order-flow.up.railway.app)
 - **Browse Source Code**: (https://github.com/Reddykesava60/OrderFlow)
 - **Demo Credentials**:
@@ -29,6 +28,10 @@ Built with a high-concurrency architecture using **Django 5.2 (ASGI/Daphne)**, *
   - **Store Manager (Owner)**: `owner@cafe.com` / `owner123`
   - **Kitchen / Barista Staff**: `barista@cafe.com` / `staff123`
   - **Customer QR Menu**: Scan table QR or visit `/r/blue-tokai-demo/`
+ 
+  - Images
+  - <img width="882" height="991" alt="Screenshot 2026-09-06 190233" src="https://github.com/user-attachments/assets/d63b797b-d847-4396-bd78-694a022f520e" />
+
 
 ---
 
