@@ -22,7 +22,8 @@ Built with a high-concurrency architecture using **Django 5.2 (ASGI/Daphne)**, *
 
 ## 🚀 Live Demo & Links
 
-- **Live Application**: [https://your-demo-url.com](https://your-demo-url.com) *(Update with your deployed link)*
+- **Live Application**: [https://your-demo-url.com](https://your-demo-url.com)
+- **Browse Source Code**: (https://github.com/Reddykesava60/OrderFlow)
 - **Demo Credentials**:
   - **Platform Admin**: `admin@platform.com` / `admin123`
   - **Store Manager (Owner)**: `owner@cafe.com` / `owner123`
